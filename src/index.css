@@ -1,42 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Islamic-themed warm design system for Masjid Al-Muhtaddun & Qiraati */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Warm, calming Islamic color palette */
+    --background: 47 25% 97%;          /* Warm cream background */
+    --foreground: 28 25% 15%;          /* Deep warm brown text */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 45 30% 99%;                /* Slightly warmer white for cards */
+    --card-foreground: 28 25% 15%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 45 30% 99%;
+    --popover-foreground: 28 25% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Islamic green as primary */
+    --primary: 158 45% 25%;            /* Deep Islamic green */
+    --primary-foreground: 45 30% 99%;
+    --primary-glow: 158 60% 35%;       /* Lighter green for hover states */
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Warm secondary tones */
+    --secondary: 45 35% 88%;           /* Warm beige */
+    --secondary-foreground: 28 25% 15%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 45 25% 92%;               /* Soft warm gray */
+    --muted-foreground: 28 15% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 38 65% 85%;              /* Soft gold accent */
+    --accent-foreground: 28 25% 15%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Warm gold highlights */
+    --gold: 43 85% 65%;                /* Islamic gold */
+    --gold-foreground: 28 25% 15%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 45 30% 99%;
 
-    --radius: 0.5rem;
+    --border: 45 20% 85%;
+    --input: 45 25% 90%;
+    --ring: 158 45% 25%;
+
+    --radius: 0.75rem;
+
+    /* Prayer time highlight */
+    --prayer-active: 158 85% 35%;
+    --prayer-next: 43 75% 75%;
+
+    /* Shadows and gradients */
+    --shadow-warm: 28 25% 15% / 0.08;
+    --gradient-mosque: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-gold: linear-gradient(135deg, hsl(var(--gold)), hsl(43 95% 75%));
+    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(45 30% 95%));
+
+    /* Animations */
+    --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-gentle: all 0.3s ease-out;
+
+    /* Arabic font scaling */
+    --arabic-scale: 1.2;
+    --font-size-arabic-sm: 1.5rem;
+    --font-size-arabic-md: 2rem;
+    --font-size-arabic-lg: 2.5rem;
+    --font-size-arabic-xl: 3rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -100,6 +129,140 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  /* Arabic text styling */
+  .arabic-text {
+    font-family: 'Amiri', 'Traditional Arabic', serif;
+    direction: rtl;
+    text-align: right;
+    line-height: 2;
+    letter-spacing: 0.02em;
+  }
+
+  /* Large button variants for elderly users */
+  .btn-mosque {
+    @apply px-8 py-6 text-lg font-semibold rounded-xl;
+    background: var(--gradient-mosque);
+    color: hsl(var(--primary-foreground));
+    transition: var(--transition-gentle);
+    box-shadow: 0 4px 16px hsl(var(--shadow-warm));
+  }
+
+  .btn-mosque:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px hsl(var(--shadow-warm));
+  }
+
+  .btn-qiraati {
+    @apply px-10 py-8 text-xl font-bold rounded-2xl;
+    background: var(--gradient-gold);
+    color: hsl(var(--gold-foreground));
+    transition: var(--transition-gentle);
+    box-shadow: 0 6px 20px hsl(var(--shadow-warm));
+  }
+
+  .btn-qiraati:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px hsl(var(--shadow-warm));
+  }
+
+  /* Microphone button for voice search */
+  .btn-microphone {
+    @apply w-24 h-24 rounded-full flex items-center justify-center;
+    background: var(--gradient-mosque);
+    color: hsl(var(--primary-foreground));
+    transition: var(--transition-smooth);
+    box-shadow: 0 8px 32px hsl(var(--shadow-warm));
+  }
+
+  .btn-microphone:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 40px hsl(var(--shadow-warm));
+  }
+
+  .btn-microphone.recording {
+    background: hsl(var(--destructive));
+    animation: pulse 1.5s infinite;
+  }
+
+  /* Prayer time cards */
+  .prayer-card {
+    @apply p-6 rounded-xl border-2;
+    background: hsl(var(--card));
+    border-color: hsl(var(--border));
+    transition: var(--transition-gentle);
+  }
+
+  .prayer-card.active {
+    background: hsl(var(--prayer-active) / 0.1);
+    border-color: hsl(var(--prayer-active));
+    box-shadow: 0 4px 20px hsl(var(--prayer-active) / 0.2);
+  }
+
+  .prayer-card.next {
+    background: hsl(var(--prayer-next) / 0.1);
+    border-color: hsl(var(--prayer-next));
+  }
+
+  /* Large text for elderly users */
+  .text-elderly {
+    @apply text-lg leading-relaxed;
+  }
+
+  .text-elderly-lg {
+    @apply text-xl leading-relaxed;
+  }
+
+  .text-elderly-xl {
+    @apply text-2xl leading-relaxed;
+  }
+
+  /* Smooth page transitions */
+  .page-transition {
+    animation: fadeInUp 0.6s ease-out;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+  }
+
+  /* Font size controls for Arabic text */
+  .font-controls {
+    @apply flex items-center gap-4 p-4 bg-card rounded-xl border;
+  }
+
+  .font-size-sm .arabic-text {
+    font-size: var(--font-size-arabic-sm);
+  }
+
+  .font-size-md .arabic-text {
+    font-size: var(--font-size-arabic-md);
+  }
+
+  .font-size-lg .arabic-text {
+    font-size: var(--font-size-arabic-lg);
+  }
+
+  .font-size-xl .arabic-text {
+    font-size: var(--font-size-arabic-xl);
   }
 }
