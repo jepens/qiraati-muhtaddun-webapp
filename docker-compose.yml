@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  qiraati-webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qiraati-muhtaddun-webapp
+    ports:
+      - "${PORT:-80}:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - qiraati-network
+    labels:
+      - "com.docker.compose.service=qiraati-webapp"
+# Disable health check sementara untuk debugging
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost/"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 40s
+
+  # Backend API proxy (REQUIRED for Quran & Prayer Times)
+  qiraati-api:
+    build:
+      context: ./backend-example
+      dockerfile: Dockerfile
+    container_name: qiraati-api
+    ports:
+      - "${API_PORT:-3001}:3001"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - qiraati-network
+    depends_on:
+      - qiraati-webapp
+
+networks:
+  qiraati-network:
+    driver: bridge
+
+# Optional: Volume untuk persistent data jika diperlukan
+# volumes:
+#   qiraati-data: 

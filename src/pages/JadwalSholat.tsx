@@ -14,7 +14,15 @@ interface PrayerTime {
   isya: string;
 }
 
-interface PrayerSchedule {
+interface PrayerScheduleResponse {
+  status: boolean;
+  request: {
+    path: string;
+  };
+  data: {
+    id: string;
+    lokasi: string;
+    daerah: string;
   jadwal: {
     tanggal: string;
     imsak: string;
@@ -25,38 +33,98 @@ interface PrayerSchedule {
     ashar: string;
     maghrib: string;
     isya: string;
+      date: string;
+    };
   };
 }
 
+// Backend API base URL
+const API_BASE_URL = 'http://localhost:3001';
+
 const JadwalSholat: React.FC = () => {
   const [prayerTimes, setPrayerTimes] = useState<PrayerTime | null>(null);
+  const [location, setLocation] = useState<string>('');
+  const [prayerDate, setPrayerDate] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [nextPrayer, setNextPrayer] = useState<string>('');
   const { toast } = useToast();
 
-  // Update current time every minute
+  // Update current time and recalculate next prayer every minute
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
+      // Recalculate next prayer if we have prayer times
+      if (prayerTimes) {
+        calculateNextPrayer(prayerTimes);
+      }
     }, 60000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [prayerTimes]);
 
-  // Fetch prayer times
+  // Fetch prayer times from backend API
   useEffect(() => {
     const fetchPrayerTimes = async () => {
       try {
+        setLoading(true);
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const date = String(now.getDate()).padStart(2, '0');
         
-        // For now, we'll use mock data since we don't have the backend proxy yet
-        // In production, this would call: `/api/prayer-times/${year}/${month}/${date}`
+        const response = await fetch(`${API_BASE_URL}/api/prayer-times/${year}/${month}/${date}`);
         
-        // Mock data for demonstration
+        if (!response.ok) {
+          throw new Error('Failed to fetch prayer times');
+        }
+        
+        const result: PrayerScheduleResponse = await response.json();
+        
+        if (result.status && result.data) {
+          const { jadwal, lokasi, daerah } = result.data;
+          
+          // Set prayer times from API response
+          setPrayerTimes({
+            imsak: jadwal.imsak,
+            subuh: jadwal.subuh,
+            terbit: jadwal.terbit,
+            dhuha: jadwal.dhuha,
+            dzuhur: jadwal.dzuhur,
+            ashar: jadwal.ashar,
+            maghrib: jadwal.maghrib,
+            isya: jadwal.isya
+          });
+          
+          // Set location info
+          setLocation(`${lokasi}, ${daerah}`);
+          setPrayerDate(jadwal.tanggal);
+          
+          // Calculate next prayer
+          calculateNextPrayer({
+            imsak: jadwal.imsak,
+            subuh: jadwal.subuh,
+            terbit: jadwal.terbit,
+            dhuha: jadwal.dhuha,
+            dzuhur: jadwal.dzuhur,
+            ashar: jadwal.ashar,
+            maghrib: jadwal.maghrib,
+            isya: jadwal.isya
+          });
+          
+        } else {
+          throw new Error('Invalid response format');
+        }
+        
+      } catch (error) {
+        console.error('Error fetching prayer times:', error);
+        toast({
+          title: "Error",
+          description: "Gagal memuat jadwal sholat. Menggunakan data fallback.",
+          variant: "destructive",
+        });
+        
+        // Fallback to mock data if API fails
         const mockPrayerTimes: PrayerTime = {
           imsak: '04:30',
           subuh: '04:40',
@@ -69,17 +137,10 @@ const JadwalSholat: React.FC = () => {
         };
 
         setPrayerTimes(mockPrayerTimes);
-        
-        // Calculate next prayer
+        setLocation('Jakarta, Indonesia');
+        setPrayerDate('Data Fallback');
         calculateNextPrayer(mockPrayerTimes);
         
-      } catch (error) {
-        console.error('Error fetching prayer times:', error);
-        toast({
-          title: "Error",
-          description: "Gagal memuat jadwal sholat. Silakan coba lagi nanti.",
-          variant: "destructive",
-        });
       } finally {
         setLoading(false);
       }
@@ -100,6 +161,7 @@ const JadwalSholat: React.FC = () => {
       { name: 'Isya', time: times.isya }
     ];
 
+    // Find the next prayer
     for (const prayer of prayers) {
       if (currentTimeStr < prayer.time) {
         setNextPrayer(prayer.name);
@@ -134,11 +196,49 @@ const JadwalSholat: React.FC = () => {
   const isPrayerTime = (prayerTime: string) => {
     const now = new Date();
     const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    return currentTimeStr === prayerTime;
+    // Allow 5 minutes window for prayer time notification
+    const [hours, minutes] = prayerTime.split(':').map(Number);
+    const prayerTimeMinutes = hours * 60 + minutes;
+    const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    return Math.abs(currentTimeMinutes - prayerTimeMinutes) <= 5;
   };
 
   const isNextPrayer = (prayerName: string) => {
     return nextPrayer === prayerName;
+  };
+
+  const getTimeUntilNextPrayer = () => {
+    if (!prayerTimes || !nextPrayer || nextPrayer === 'Subuh (Besok)') return '';
+    
+    const now = new Date();
+    const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+    
+    const prayers = [
+      { name: 'Subuh', time: prayerTimes.subuh },
+      { name: 'Dzuhur', time: prayerTimes.dzuhur },
+      { name: 'Ashar', time: prayerTimes.ashar },
+      { name: 'Maghrib', time: prayerTimes.maghrib },
+      { name: 'Isya', time: prayerTimes.isya }
+    ];
+
+    const nextPrayerTime = prayers.find(p => p.name === nextPrayer)?.time;
+    if (!nextPrayerTime) return '';
+
+    const [hours, minutes] = nextPrayerTime.split(':').map(Number);
+    const nextPrayerMinutes = hours * 60 + minutes;
+    const diffMinutes = nextPrayerMinutes - currentTimeMinutes;
+    
+    if (diffMinutes <= 0) return '';
+    
+    const diffHours = Math.floor(diffMinutes / 60);
+    const remainingMinutes = diffMinutes % 60;
+    
+    if (diffHours > 0) {
+      return `${diffHours} jam ${remainingMinutes} menit lagi`;
+    } else {
+      return `${remainingMinutes} menit lagi`;
+    }
   };
 
   if (loading) {
@@ -161,10 +261,10 @@ const JadwalSholat: React.FC = () => {
         </h1>
         <div className="flex items-center justify-center gap-2 text-elderly-lg text-muted-foreground mb-2">
           <MapPin className="w-5 h-5" />
-          <span>Jakarta, Indonesia</span>
+          <span>{location || 'Jakarta, Indonesia'}</span>
         </div>
         <p className="text-elderly text-muted-foreground">
-          {currentTime.toLocaleDateString('id-ID', {
+          {prayerDate || currentTime.toLocaleDateString('id-ID', {
             weekday: 'long',
             year: 'numeric',
             month: 'long',
@@ -187,6 +287,11 @@ const JadwalSholat: React.FC = () => {
               <p className="text-elderly-lg font-semibold text-prayer-active">
                 Sholat Selanjutnya: {nextPrayer}
               </p>
+              {getTimeUntilNextPrayer() && (
+                <p className="text-elderly text-prayer-active mt-2">
+                  {getTimeUntilNextPrayer()}
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -203,30 +308,28 @@ const JadwalSholat: React.FC = () => {
             return (
               <Card
                 key={prayerName}
-                className={`prayer-card text-center ${
-                  isActive ? 'active' : isNext ? 'next' : ''
-                }`}
+                className={`prayer-card ${isActive ? 'active' : ''} ${isNext ? 'border-prayer-active' : ''}`}
               >
-                <CardHeader className="pb-4">
-                  <div className="flex justify-center mb-3">
+                <CardHeader className="text-center pb-3">
+                  <div className="flex justify-center mb-2">
                     {getPrayerIcon(prayerName)}
                   </div>
-                  <CardTitle className="text-elderly-lg">
+                  <CardTitle className="text-elderly-lg text-primary">
                     {displayName}
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="text-center">
                   <p className="text-3xl font-bold text-primary mb-2">
                     {time}
                   </p>
-                  {isActive && (
+                  {isNext && (
                     <p className="text-sm text-prayer-active font-semibold">
-                      Waktu Sholat Sekarang
+                      Sholat Selanjutnya
                     </p>
                   )}
-                  {isNext && !isActive && (
-                    <p className="text-sm text-prayer-next font-semibold">
-                      Sholat Selanjutnya
+                  {isActive && (
+                    <p className="text-sm text-prayer-active font-semibold animate-pulse">
+                      Waktu Sholat
                     </p>
                   )}
                 </CardContent>
@@ -236,29 +339,15 @@ const JadwalSholat: React.FC = () => {
         </div>
       )}
 
-      {/* Important Notes */}
-      <div className="mt-12">
-        <Card className="bg-accent/20 border-accent">
-          <CardHeader>
-            <CardTitle className="text-elderly-lg text-center">
-              Catatan Penting
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-elderly">
-            <p className="text-center">
-              • Jadwal sholat berdasarkan lokasi Jakarta, Indonesia
+      {/* Footer Info */}
+      <div className="mt-12 text-center">
+        <Card className="bg-accent/10 border-accent">
+          <CardContent className="py-6">
+            <p className="text-elderly text-muted-foreground mb-2">
+              <strong>Catatan:</strong> Jadwal sholat berdasarkan perhitungan untuk wilayah Jakarta.
             </p>
-            <p className="text-center">
-              • Waktu dapat berbeda 2-3 menit tergantung lokasi spesifik
-            </p>
-            <p className="text-center">
-              • Dianjurkan untuk memulai persiapan 10-15 menit sebelum waktu sholat
-            </p>
-            <div className="text-center arabic-text text-xl text-primary font-semibold mt-6">
-              وَأَقِمِ الصَّلَاةَ إِنَّ الصَّلَاةَ تَنْهَىٰ عَنِ الْفَحْشَاءِ وَالْمُنكَرِ
-            </div>
-            <p className="text-center italic text-muted-foreground text-sm">
-              "Dan laksanakanlah sholat. Sesungguhnya sholat itu mencegah dari perbuatan keji dan mungkar." (QS. Al-Ankabut: 45)
+            <p className="text-elderly text-muted-foreground">
+              Mohon sesuaikan dengan kondisi dan ketentuan setempat.
             </p>
           </CardContent>
         </Card>

@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  qiraati-webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qiraati-muhtaddun-webapp
+    ports:
+      - "${PORT:-80}:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - qiraati-network
+    labels:
+      - "com.docker.compose.service=qiraati-webapp"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Backend API (uncomment jika diperlukan)
+  # qiraati-api:
+  #   build:
+  #     context: ./backend-example
+  #     dockerfile: Dockerfile
+  #   container_name: qiraati-api
+  #   ports:
+  #     - "${API_PORT:-3001}:3000"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - PORT=3000
+  #   restart: unless-stopped
+  #   networks:
+  #     - qiraati-network
+  #   depends_on:
+  #     - qiraati-webapp
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256M
+  #         cpus: '0.25'
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "5m"
+  #       max-file: "3"
+
+  # Nginx Reverse Proxy (uncomment jika ingin menggunakan)
+  # nginx-proxy:
+  #   image: nginx:alpine
+  #   container_name: nginx-proxy
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx-proxy.conf:/etc/nginx/conf.d/default.conf
+  #     - ./ssl-certs:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - qiraati-webapp
+  #   restart: unless-stopped
+  #   networks:
+  #     - qiraati-network
+
+networks:
+  qiraati-network:
+    driver: bridge
+    name: qiraati-network
+
+# Volumes untuk data persistence (jika diperlukan)
+# volumes:
+#   qiraati-data:
+#     driver: local 

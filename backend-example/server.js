@@ -11,6 +11,11 @@ app.use(express.json());
 
 // API Routes
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 // Get all surahs from EQuran.id API
 app.get('/api/quran/surat', async (req, res) => {
   try {

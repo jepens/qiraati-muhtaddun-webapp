@@ -1,8 +1,64 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { MapPin, Phone, Mail, Clock, Heart, Users, Book } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/lib/supabase';
+import type { AboutContent, Facility } from '@/types/database.types';
+import { Loader2 } from 'lucide-react';
+import { Icons } from '@/components/icons';
 
 const TentangKami: React.FC = () => {
+  const [content, setContent] = useState<AboutContent | null>(null);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchContent();
+    fetchFacilities();
+  }, []);
+
+  const fetchContent = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('about_content')
+        .select('*')
+        .single();
+
+      if (error) throw error;
+      setContent(data);
+    } catch (error) {
+      console.error('Error fetching content:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchFacilities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('facilities')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setFacilities(data || []);
+    } catch (error) {
+      console.error('Error fetching facilities:', error);
+    }
+  };
+
+  const IconComponent = ({ name }: { name: Facility['icon_name'] }) => {
+    const Icon = Icons[name];
+    return Icon ? <Icon className="w-12 h-12 text-primary mx-auto mb-4" /> : null;
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8 flex justify-center items-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -29,21 +85,7 @@ const TentangKami: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 text-elderly-lg leading-relaxed">
-            <p>
-              Masjid Al-Muhtaddun didirikan pada tahun 1995 oleh sekelompok umat Muslim 
-              yang memiliki visi untuk menciptakan tempat ibadah yang tidak hanya berfungsi 
-              sebagai tempat sholat, tetapi juga sebagai pusat pendidikan dan dakwah Islam.
-            </p>
-            <p>
-              Nama "Al-Muhtaddun" yang berarti "orang-orang yang mendapat petunjuk" 
-              dipilih dengan harapan bahwa masjid ini dapat menjadi tempat di mana 
-              umat Muslim dapat memperoleh hidayah dan memperdalam pemahaman agama mereka.
-            </p>
-            <p>
-              Sejak berdiri, Masjid Al-Muhtaddun telah melayani ribuan jamaah dan 
-              menjadi pusat kegiatan keislaman di wilayah ini. Berbagai program 
-              pendidikan, sosial, dan dakwah telah dilaksanakan untuk kesejahteraan umat.
-            </p>
+            <p>{content?.history_text}</p>
           </CardContent>
         </Card>
       </section>
@@ -61,9 +103,7 @@ const TentangKami: React.FC = () => {
             </CardHeader>
             <CardContent>
               <p className="text-elderly-lg text-center leading-relaxed">
-                Menjadi masjid yang memakmur dalam menjalankan fungsi ibadah, 
-                pendidikan, dan dakwah untuk membentuk umat yang bertakwa, 
-                berilmu, dan berakhlaq mulia.
+                {content?.vision_text}
               </p>
             </CardContent>
           </Card>
@@ -78,11 +118,9 @@ const TentangKami: React.FC = () => {
             </CardHeader>
             <CardContent>
               <ul className="text-elderly-lg space-y-3">
-                <li>• Menyelenggarakan ibadah yang khusyuk dan berjamaah</li>
-                <li>• Memberikan pendidikan agama untuk segala usia</li>
-                <li>• Melaksanakan dakwah Islam dengan bijaksana</li>
-                <li>• Memberdayakan umat melalui kegiatan sosial</li>
-                <li>• Mempererat ukhuwah islamiyah</li>
+                {content?.mission_items.map((item, index) => (
+                  <li key={index}>• {item}</li>
+                ))}
               </ul>
             </CardContent>
           </Card>
@@ -95,29 +133,15 @@ const TentangKami: React.FC = () => {
           Fasilitas Masjid
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="text-center p-6">
-            <Users className="w-12 h-12 text-primary mx-auto mb-4" />
-            <h3 className="text-elderly-lg font-semibold mb-2">Ruang Sholat</h3>
+          {facilities.map((facility) => (
+            <Card key={facility.id} className="text-center p-6">
+              <IconComponent name={facility.icon_name} />
+              <h3 className="text-elderly-lg font-semibold mb-2">{facility.name}</h3>
             <p className="text-elderly text-muted-foreground">
-              Kapasitas 500 jamaah dengan AC dan sound system
+                {facility.description}
             </p>
           </Card>
-
-          <Card className="text-center p-6">
-            <Book className="w-12 h-12 text-primary mx-auto mb-4" />
-            <h3 className="text-elderly-lg font-semibold mb-2">Perpustakaan</h3>
-            <p className="text-elderly text-muted-foreground">
-              Koleksi buku-buku Islam dan Al-Quran
-            </p>
-          </Card>
-
-          <Card className="text-center p-6">
-            <Clock className="w-12 h-12 text-primary mx-auto mb-4" />
-            <h3 className="text-elderly-lg font-semibold mb-2">Ruang Kajian</h3>
-            <p className="text-elderly text-muted-foreground">
-              Tempat pengajian dan diskusi keislaman
-            </p>
-          </Card>
+          ))}
         </div>
       </section>
 
@@ -136,10 +160,8 @@ const TentangKami: React.FC = () => {
                   <MapPin className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
                   <div>
                     <h4 className="text-elderly-lg font-semibold mb-2">Alamat</h4>
-                    <p className="text-elderly text-muted-foreground">
-                      Jl. Masjid Al-Muhtaddun No. 123<br />
-                      Jakarta Selatan 12345<br />
-                      Indonesia
+                    <p className="text-elderly text-muted-foreground whitespace-pre-line">
+                      {content?.address}
                     </p>
                   </div>
                 </div>
@@ -148,9 +170,8 @@ const TentangKami: React.FC = () => {
                   <Phone className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
                   <div>
                     <h4 className="text-elderly-lg font-semibold mb-2">Telepon</h4>
-                    <p className="text-elderly text-muted-foreground">
-                      (021) 1234-5678<br />
-                      +62 812-3456-7890
+                    <p className="text-elderly text-muted-foreground whitespace-pre-line">
+                      {content?.phone}
                     </p>
                   </div>
                 </div>
@@ -161,9 +182,8 @@ const TentangKami: React.FC = () => {
                   <Mail className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
                   <div>
                     <h4 className="text-elderly-lg font-semibold mb-2">Email</h4>
-                    <p className="text-elderly text-muted-foreground">
-                      info@almuhtaddun.org<br />
-                      takmir@almuhtaddun.org
+                    <p className="text-elderly text-muted-foreground whitespace-pre-line">
+                      {content?.email}
                     </p>
                   </div>
                 </div>
@@ -172,9 +192,8 @@ const TentangKami: React.FC = () => {
                   <Clock className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
                   <div>
                     <h4 className="text-elderly-lg font-semibold mb-2">Jam Buka</h4>
-                    <p className="text-elderly text-muted-foreground">
-                      24 jam (untuk ibadah)<br />
-                      Kantor: 08.00 - 17.00 WIB
+                    <p className="text-elderly text-muted-foreground whitespace-pre-line">
+                      {content?.office_hours}
                     </p>
                   </div>
                 </div>

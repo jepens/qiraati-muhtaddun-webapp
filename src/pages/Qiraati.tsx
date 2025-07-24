@@ -1,69 +1,111 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Search, BookOpen, Volume2 } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Mic, MicOff, Search, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-
-// Mock Surah data - In production, this would come from the API
-const mockSurahs = [
-  { nomor: 1, nama: 'Al-Fatihah', namaLatin: 'Al-Fatihah', arti: 'Pembukaan', jumlahAyat: 7 },
-  { nomor: 2, nama: 'Al-Baqarah', namaLatin: 'Al-Baqarah', arti: 'Sapi Betina', jumlahAyat: 286 },
-  { nomor: 18, nama: 'Al-Kahf', namaLatin: 'Al-Kahf', arti: 'Gua', jumlahAyat: 110 },
-  { nomor: 36, nama: 'Yasin', namaLatin: 'Yasin', arti: 'Yasin', jumlahAyat: 83 },
-  { nomor: 55, nama: 'Ar-Rahman', namaLatin: 'Ar-Rahman', arti: 'Yang Maha Pengasih', jumlahAyat: 78 },
-  { nomor: 67, nama: 'Al-Mulk', namaLatin: 'Al-Mulk', arti: 'Kerajaan', jumlahAyat: 30 },
-  { nomor: 112, nama: 'Al-Ikhlas', namaLatin: 'Al-Ikhlas', arti: 'Keikhlasan', jumlahAyat: 4 },
-];
+import { Skeleton } from '@/components/ui/skeleton';
+import { useSurahList } from '@/hooks/useQuran';
 
 const Qiraati: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState(mockSurahs);
   const [transcript, setTranscript] = useState('');
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { surahs: allSurahs, loading } = useSurahList();
+  const [searchResults, setSearchResults] = useState(allSurahs);
+
+  // Update search results when surahs change
+  React.useEffect(() => {
+    setSearchResults(allSurahs);
+  }, [allSurahs]);
 
   // Initialize Speech Recognition
-  useEffect(() => {
+  React.useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       
       if (recognitionRef.current) {
         recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
+        recognitionRef.current.interimResults = true;
         recognitionRef.current.lang = 'id-ID'; // Indonesian language
+        recognitionRef.current.maxAlternatives = 3; // Get multiple alternatives
         
         recognitionRef.current.onstart = () => {
           setIsListening(true);
           toast({
             title: "Mendengarkan...",
-            description: "Silakan ucapkan nama surat atau ayat yang ingin dibaca",
+            description: "Silakan ucapkan nama atau nomor surat yang ingin dibaca",
           });
         };
         
-        recognitionRef.current.onresult = (event) => {
-          const speechResult = event.results[0][0].transcript;
-          setTranscript(speechResult);
-          setSearchQuery(speechResult);
-          handleVoiceSearch(speechResult);
+        recognitionRef.current.onresult = (event: any) => {
+          let finalTranscript = '';
+          let interimTranscript = '';
+          
+          // Process all results to get the best match
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+          
+          // If we have a final result, use it
+          if (finalTranscript) {
+            setTranscript(finalTranscript);
+            setSearchQuery(finalTranscript);
+            handleVoiceSearch(finalTranscript);
+          }
+          // Show interim results while still processing
+          else if (interimTranscript) {
+            setTranscript(interimTranscript);
+            setSearchQuery(interimTranscript);
+          }
         };
         
-        recognitionRef.current.onerror = (event) => {
+        recognitionRef.current.onerror = (event: any) => {
           console.error('Speech recognition error:', event.error);
           setIsListening(false);
+          
+          let errorMessage = "Maaf, suara tidak dikenali. ";
+          switch (event.error) {
+            case 'network':
+              errorMessage += "Periksa koneksi internet Anda.";
+              break;
+            case 'not-allowed':
+            case 'permission-denied':
+              errorMessage += "Izinkan akses mikrofon untuk menggunakan fitur ini.";
+              break;
+            case 'no-speech':
+              errorMessage += "Tidak ada suara yang terdeteksi. Mohon coba lagi.";
+              break;
+            default:
+              errorMessage += "Mohon coba lagi dengan lebih jelas atau gunakan pencarian teks.";
+          }
+          
           toast({
             title: "Error",
-            description: "Maaf, suara tidak dikenali. Mohon coba lagi dengan lebih jelas atau gunakan pencarian teks.",
+            description: errorMessage,
             variant: "destructive",
           });
         };
         
         recognitionRef.current.onend = () => {
           setIsListening(false);
+          // If no final result was received, show a message
+          if (!transcript) {
+            toast({
+              title: "Info",
+              description: "Pencarian suara selesai. Jika hasil tidak sesuai, coba ucapkan dengan lebih jelas.",
+            });
+          }
         };
       }
     } else {
@@ -73,7 +115,7 @@ const Qiraati: React.FC = () => {
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [toast, transcript]);
 
   const startVoiceRecognition = () => {
     if (recognitionRef.current && !isListening) {
@@ -99,17 +141,52 @@ const Qiraati: React.FC = () => {
   const handleVoiceSearch = (query: string) => {
     const normalizedQuery = query.toLowerCase().trim();
     
-    // Remove common prefixes
-    const cleanQuery = normalizedQuery
-      .replace(/^(surat|surah|al-|ar-|an-)\s*/i, '')
+    // Convert number words to digits (Indonesian)
+    const numberMap: { [key: string]: string } = {
+      'satu': '1', 'dua': '2', 'tiga': '3', 'empat': '4', 'lima': '5',
+      'enam': '6', 'tujuh': '7', 'delapan': '8', 'sembilan': '9', 'nol': '0',
+      'sepuluh': '10', 'sebelas': '11', 'dua belas': '12', 'tiga belas': '13',
+      'empat belas': '14', 'lima belas': '15', 'enam belas': '16',
+      'tujuh belas': '17', 'delapan belas': '18', 'sembilan belas': '19',
+      'dua puluh': '20', 'tiga puluh': '30', 'empat puluh': '40',
+      'lima puluh': '50', 'enam puluh': '60', 'tujuh puluh': '70',
+      'delapan puluh': '80', 'sembilan puluh': '90', 'seratus': '100',
+      'tiga puluh enam': '36' // Khusus untuk Yasin
+    };
+
+    // Convert number words to digits
+    let processedQuery = normalizedQuery;
+    Object.entries(numberMap).forEach(([word, digit]) => {
+      processedQuery = processedQuery.replace(new RegExp(`\\b${word}\\b`, 'g'), digit);
+    });
+    
+    // Remove common prefixes and normalize variations
+    processedQuery = processedQuery
+      .replace(/^(surat|surah|al-|ar-|an-|surat ke|surah ke|nomor|nomer)\s*/i, '')
+      .replace(/\byaasin\b/i, 'yasin')
+      .replace(/\byassin\b/i, 'yasin')
+      .replace(/\byaa sin\b/i, 'yasin')
+      .replace(/\byas sin\b/i, 'yasin')
+      .replace(/\bya sin\b/i, 'yasin')
       .trim();
     
     // Search for matching surahs
-    const results = mockSurahs.filter(surah => 
-      surah.namaLatin.toLowerCase().includes(cleanQuery) ||
-      surah.nama.toLowerCase().includes(cleanQuery) ||
-      surah.arti.toLowerCase().includes(cleanQuery)
-    );
+    const results = allSurahs.filter(surah => {
+      const surahNumber = surah.nomor.toString();
+      const namaLatin = surah.namaLatin.toLowerCase();
+      const nama = surah.nama.toLowerCase();
+      const arti = surah.arti.toLowerCase();
+      
+      return (
+        surahNumber === processedQuery ||
+        namaLatin.includes(processedQuery) ||
+        nama.includes(processedQuery) ||
+        arti.includes(processedQuery) ||
+        // Additional checks for number + name combinations
+        `${surahNumber} ${namaLatin}`.includes(processedQuery) ||
+        `${namaLatin} ${surahNumber}`.includes(processedQuery)
+      );
+    });
     
     if (results.length > 0) {
       setSearchResults(results);
@@ -120,16 +197,16 @@ const Qiraati: React.FC = () => {
     } else {
       setSearchResults([]);
       toast({
+        variant: "destructive",
         title: "Tidak Ditemukan",
         description: `Tidak ada surat yang ditemukan untuk "${query}". Coba kata kunci lain.`,
-        variant: "destructive",
       });
     }
   };
 
   const handleTextSearch = (query: string) => {
     if (!query.trim()) {
-      setSearchResults(mockSurahs);
+      setSearchResults(allSurahs);
       return;
     }
     
@@ -138,7 +215,7 @@ const Qiraati: React.FC = () => {
       .replace(/^(surat|surah|al-|ar-|an-)\s*/i, '')
       .trim();
     
-    const results = mockSurahs.filter(surah => 
+    const results = allSurahs.filter(surah => 
       surah.namaLatin.toLowerCase().includes(cleanQuery) ||
       surah.nama.toLowerCase().includes(cleanQuery) ||
       surah.arti.toLowerCase().includes(cleanQuery) ||
@@ -154,154 +231,95 @@ const Qiraati: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="text-center mb-12">
-        <div className="mb-6">
-          <BookOpen className="w-20 h-20 text-primary mx-auto mb-4" />
-          <h1 className="text-4xl md:text-5xl font-bold text-primary mb-4">
-            Qiraati
-          </h1>
-          <p className="text-2xl text-gold font-semibold mb-2">
-            أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ
-          </p>
-          <p className="text-elderly-lg text-muted-foreground">
-            Aplikasi Al-Quran dengan Suara
-          </p>
-        </div>
-      </div>
-
-      {/* Voice Search Section */}
-      <div className="max-w-2xl mx-auto mb-12">
-        <Card className="text-center p-8">
-          <CardContent className="space-y-6">
-            {/* Microphone Button */}
-            <div className="flex justify-center">
-              <button
+      <div className="flex flex-col gap-6">
+        {/* Search Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BookOpen className="w-6 h-6" />
+              Cari Surat
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Ketik nama atau nomor surat..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    handleTextSearch(e.target.value);
+                  }}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                variant={isListening ? "destructive" : "secondary"}
                 onClick={isListening ? stopVoiceRecognition : startVoiceRecognition}
-                className={`btn-microphone ${isListening ? 'recording' : ''}`}
-                disabled={!recognitionRef.current}
+                className="flex items-center gap-2"
               >
                 {isListening ? (
-                  <MicOff className="w-10 h-10" />
+                  <>
+                    <MicOff className="w-4 h-4" />
+                    <span className="hidden sm:inline">Berhenti</span>
+                  </>
                 ) : (
-                  <Mic className="w-10 h-10" />
+                  <>
+                    <Mic className="w-4 h-4" />
+                    <span className="hidden sm:inline">Cari dengan Suara</span>
+                  </>
                 )}
-              </button>
+              </Button>
             </div>
-            
-            {/* Instructions */}
-            <div className="space-y-2">
-              <p className="text-elderly-lg font-semibold text-primary">
-                {isListening ? 'Mendengarkan...' : 'Tekan mikrofon untuk mencari surat/ayat'}
-              </p>
-              <p className="text-elderly text-muted-foreground">
-                Contoh: "Surat Al-Fatihah", "Al-Baqarah", "Yasin"
-              </p>
-            </div>
-
-            {/* Voice Transcript */}
-            {transcript && (
-              <div className="bg-accent/20 rounded-lg p-4">
-                <p className="text-elderly font-medium text-accent-foreground">
-                  Yang diucapkan: "{transcript}"
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Text Search */}
-      <div className="max-w-2xl mx-auto mb-12">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-6 h-6" />
-          <Input
-            type="text"
-            placeholder="Atau ketik nama surat di sini..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              handleTextSearch(e.target.value);
-            }}
-            className="pl-12 pr-4 py-6 text-elderly text-center rounded-xl border-2"
-          />
-        </div>
-      </div>
-
-      {/* Search Results */}
-      <div className="max-w-4xl mx-auto">
-        <h2 className="text-2xl font-bold text-primary mb-6 text-center">
-          {searchQuery ? `Hasil Pencarian "${searchQuery}"` : 'Daftar Surat Al-Quran'}
-        </h2>
-        
-        {searchResults.length === 0 ? (
-          <Card className="text-center p-8">
-            <CardContent>
-              <p className="text-elderly-lg text-muted-foreground">
-                Tidak ada surat yang ditemukan. Coba kata kunci lain.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {searchResults.map((surah) => (
-              <Card
-                key={surah.nomor}
-                className="prayer-card cursor-pointer hover:transform hover:scale-105"
-                onClick={() => handleSurahClick(surah.nomor)}
-              >
-                <CardHeader className="text-center">
-                  <div className="w-12 h-12 bg-primary text-primary-foreground rounded-full flex items-center justify-center mx-auto mb-3 text-xl font-bold">
-                    {surah.nomor}
-                  </div>
-                  <CardTitle className="text-elderly-lg">
-                    {surah.namaLatin}
-                  </CardTitle>
-                  <p className="arabic-text text-xl text-primary font-semibold">
-                    {surah.nama}
-                  </p>
+        {/* Surah List */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {loading ? (
+            // Loading skeletons
+            Array.from({ length: 6 }).map((_, index) => (
+              <Card key={`skeleton-${index}`} className="cursor-pointer hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <Skeleton className="h-6 w-24" />
                 </CardHeader>
-                <CardContent className="text-center">
-                  <p className="text-elderly text-muted-foreground mb-2">
-                    {surah.arti}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {surah.jumlahAyat} Ayat
-                  </p>
-                  <div className="mt-4 flex justify-center">
-                    <Volume2 className="w-5 h-5 text-gold" />
+                <CardContent>
+                  <div className="flex flex-col gap-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Quick Access Popular Surahs */}
-      <div className="max-w-4xl mx-auto mt-16">
-        <h3 className="text-xl font-bold text-primary mb-6 text-center">
-          Surat Populer
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[1, 18, 36, 112].map((surahNumber) => {
-            const surah = mockSurahs.find(s => s.nomor === surahNumber);
-            if (!surah) return null;
-            
-            return (
-              <Button
-                key={surahNumber}
-                variant="outline"
-                className="h-auto p-4 text-center"
-                onClick={() => handleSurahClick(surahNumber)}
+            ))
+          ) : searchResults.length > 0 ? (
+            searchResults.map((surah) => (
+              <Card
+                key={surah.nomor}
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => handleSurahClick(surah.nomor)}
               >
-                <div>
-                  <p className="font-bold text-elderly">{surah.namaLatin}</p>
-                  <p className="text-sm text-muted-foreground">{surah.jumlahAyat} Ayat</p>
-                </div>
-              </Button>
-            );
-          })}
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>{surah.nomor}. {surah.namaLatin}</span>
+                    <span className="text-xl font-arabic">{surah.nama}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">{surah.arti}</p>
+                  <p className="text-sm mt-2">
+                    <span className="font-medium">{surah.jumlahAyat}</span> Ayat
+                  </p>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="col-span-full text-center py-8">
+              <p className="text-muted-foreground">Tidak ada surat yang ditemukan.</p>
+              <p className="text-sm">Coba kata kunci lain atau periksa ejaan Anda. Contoh: Surat Yasin / Surah Yasin</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

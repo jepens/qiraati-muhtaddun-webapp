@@ -1,39 +1,54 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Layout from "./components/Layout";
-import Homepage from "./pages/Homepage";
-import Qiraati from "./pages/Qiraati";
-import SurahDetail from "./pages/SurahDetail";
-import JadwalSholat from "./pages/JadwalSholat";
-import TentangKami from "./pages/TentangKami";
-import Kegiatan from "./pages/Kegiatan";
-import NotFound from "./pages/NotFound";
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from '@/components/ui/sonner';
+import Layout from '@/components/Layout';
+import Homepage from '@/pages/Homepage';
+import Qiraati from '@/pages/Qiraati';
+import SurahDetail from '@/pages/SurahDetail';
+import JadwalSholat from '@/pages/JadwalSholat';
+import Kegiatan from '@/pages/Kegiatan';
+import Galeri from '@/pages/Galeri';
+import TentangKami from '@/pages/TentangKami';
+import NotFound from '@/pages/NotFound';
+import Login from '@/pages/Login';
+import Dashboard from '@/pages/admin/Dashboard';
+import PrivateRoute from '@/components/PrivateRoute';
+import { AuthProvider } from '@/providers/AuthProvider';
+import { ActivitiesProvider } from '@/hooks/useActivities';
+import { GalleryProvider } from '@/hooks/useGallery';
 
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Homepage />} />
-            <Route path="/qiraati" element={<Qiraati />} />
-            <Route path="/qiraati/surat/:id" element={<SurahDetail />} />
-            <Route path="/jadwal-sholat" element={<JadwalSholat />} />
-            <Route path="/tentang-kami" element={<TentangKami />} />
-            <Route path="/kegiatan" element={<Kegiatan />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Layout>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <ActivitiesProvider>
+          <GalleryProvider>
+            <Routes>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Homepage />} />
+                <Route path="/qiraati" element={<Qiraati />} />
+                <Route path="/qiraati/surat/:id" element={<SurahDetail />} />
+                <Route path="/jadwal-sholat" element={<JadwalSholat />} />
+                <Route path="/kegiatan" element={<Kegiatan />} />
+                <Route path="/galeri" element={<Galeri />} />
+                <Route path="/tentang-kami" element={<TentangKami />} />
+                <Route path="/login" element={<Login />} />
+                <Route
+                  path="/admin/*"
+                  element={
+                    <PrivateRoute>
+                      <Dashboard />
+                    </PrivateRoute>
+                  }
+                />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+            <Toaster />
+          </GalleryProvider>
+        </ActivitiesProvider>
+      </AuthProvider>
+    </Router>
+  );
+}
 
 export default App;
