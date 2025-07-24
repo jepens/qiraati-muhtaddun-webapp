@@ -201,10 +201,10 @@ const TentangKami: React.FC = () => {
             </div>
 
             {/* Google Maps */}
-            {content?.google_maps_embed && (
+            {content?.google_maps_embed && content.google_maps_embed.startsWith('http') && (
               <div className="mt-8">
                 <h4 className="text-elderly-lg font-semibold mb-4 text-center">Lokasi Masjid</h4>
-                <div className="w-full h-80 rounded-lg overflow-hidden border-2 border-primary/20">
+                <div className="w-full h-80 rounded-lg overflow-hidden border-2 border-primary/20 bg-gray-50">
                   <iframe
                     src={content.google_maps_embed}
                     width="100%"
@@ -214,8 +214,14 @@ const TentangKami: React.FC = () => {
                     loading="lazy"
                     referrerPolicy="no-referrer-when-downgrade"
                     title="Lokasi Masjid Al-Muhtaddun"
+                    onError={(e) => {
+                      console.error('Google Maps iframe failed to load:', e);
+                    }}
                   />
                 </div>
+                <p className="text-center text-sm text-muted-foreground mt-2">
+                  Klik pada peta untuk melihat lokasi yang lebih detail
+                </p>
               </div>
             )}
 

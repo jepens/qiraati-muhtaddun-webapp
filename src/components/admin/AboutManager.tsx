@@ -211,33 +211,70 @@ const AboutManager: React.FC = () => {
 
             {/* Google Maps Embed */}
             <div className="space-y-2">
-              <Label htmlFor="google_maps_embed">Google Maps Embed URL</Label>
-              <Input
+              <Label htmlFor="google_maps_embed">Google Maps Embed</Label>
+              <Textarea
                 id="google_maps_embed"
                 value={content?.google_maps_embed || ''}
-                onChange={(e) => setContent(prev => ({ ...prev!, google_maps_embed: e.target.value }))}
-                placeholder="Masukkan URL embed Google Maps..."
+                onChange={(e) => {
+                  const value = e.target.value;
+                  let embedUrl = value;
+                  
+                  // Jika input adalah iframe HTML, ekstrak URL-nya
+                  if (value.includes('<iframe')) {
+                    const urlMatch = value.match(/src="([^"]+)"/);
+                    if (urlMatch) {
+                      embedUrl = urlMatch[1];
+                    }
+                  }
+                  
+                  setContent(prev => ({ ...prev!, google_maps_embed: embedUrl }));
+                }}
+                rows={3}
+                placeholder="Paste iframe HTML dari Google Maps atau URL embed langsung..."
               />
-              <p className="text-sm text-muted-foreground">
-                Cara mendapatkan URL embed: Buka Google Maps → Cari lokasi masjid → Klik "Share" → Pilih "Embed a map" → Copy URL
-              </p>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p><strong>Cara mendapatkan embed:</strong></p>
+                <ol className="list-decimal list-inside space-y-1 ml-2">
+                  <li>Buka <a href="https://maps.google.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google Maps</a></li>
+                  <li>Cari lokasi "Masjid Al-Muhtadun"</li>
+                  <li>Klik tombol "Share" (Bagikan)</li>
+                  <li>Pilih tab "Embed a map" (Sematkan peta)</li>
+                  <li>Copy seluruh iframe HTML yang muncul</li>
+                  <li>Paste di field di atas</li>
+                </ol>
+                <p className="mt-2 text-xs">
+                  <strong>Contoh format:</strong> &lt;iframe src="https://www.google.com/maps/embed?pb=..."&gt;
+                </p>
+              </div>
             </div>
 
             {/* Preview Google Maps */}
             {content?.google_maps_embed && (
               <div className="space-y-2">
                 <Label>Preview Peta</Label>
-                <div className="w-full h-64 border rounded-md overflow-hidden">
-                  <iframe
-                    src={content.google_maps_embed}
-                    width="100%"
-                    height="100%"
-                    style={{ border: 0 }}
-                    allowFullScreen
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
+                <div className="w-full h-80 border rounded-md overflow-hidden bg-gray-50">
+                  {content.google_maps_embed.startsWith('http') ? (
+                    <iframe
+                      src={content.google_maps_embed}
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0 }}
+                      allowFullScreen
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                      title="Lokasi Masjid Al-Muhtadun"
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      <p>URL embed tidak valid. Pastikan URL dimulai dengan "https://"</p>
+                    </div>
+                  )}
                 </div>
+                {content.google_maps_embed && (
+                  <p className="text-xs text-muted-foreground">
+                    URL: {content.google_maps_embed}
+                  </p>
+                )}
               </div>
             )}
 
