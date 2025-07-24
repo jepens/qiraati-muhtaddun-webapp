@@ -8,6 +8,7 @@ import JadwalSholat from '@/pages/JadwalSholat';
 import Kegiatan from '@/pages/Kegiatan';
 import Galeri from '@/pages/Galeri';
 import TentangKami from '@/pages/TentangKami';
+import GameHafalan from '@/pages/GameHafalan';
 import NotFound from '@/pages/NotFound';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/admin/Dashboard';
@@ -27,6 +28,7 @@ function App() {
                 <Route path="/" element={<Homepage />} />
                 <Route path="/qiraati" element={<Qiraati />} />
                 <Route path="/qiraati/surat/:id" element={<SurahDetail />} />
+                <Route path="/game-hafalan" element={<GameHafalan />} />
                 <Route path="/jadwal-sholat" element={<JadwalSholat />} />
                 <Route path="/kegiatan" element={<Kegiatan />} />
                 <Route path="/galeri" element={<Galeri />} />

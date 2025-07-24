@@ -1,28 +1,41 @@
-import React, { useState, useRef } from 'react';
-import { Mic, MicOff, Search, BookOpen } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { Search, Mic, MicOff, BookOpen } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSurahList } from '@/hooks/useQuran';
 
 const Qiraati: React.FC = () => {
-  const [isListening, setIsListening] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [isDataReady, setIsDataReady] = useState(false);
+  const [loading, setLoading] = useState(true);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { surahs: allSurahs, loading } = useSurahList();
-  const [searchResults, setSearchResults] = useState(allSurahs);
+  const { surahs: allSurahs, loading: surahLoading } = useSurahList();
 
   // Update search results when surahs change
   React.useEffect(() => {
     setSearchResults(allSurahs);
+    if (allSurahs.length > 0) {
+      setIsDataReady(true);
+    } else {
+      setIsDataReady(false);
+    }
   }, [allSurahs]);
+
+  // Update loading state based on surahLoading
+  React.useEffect(() => {
+    setLoading(surahLoading);
+  }, [surahLoading]);
 
   // Initialize Speech Recognition
   React.useEffect(() => {
@@ -64,7 +77,15 @@ const Qiraati: React.FC = () => {
           if (finalTranscript) {
             setTranscript(finalTranscript);
             setSearchQuery(finalTranscript);
-            handleVoiceSearch(finalTranscript);
+            // Check if surahs are loaded before searching
+            if (allSurahs.length > 0) {
+              handleVoiceSearch(finalTranscript);
+            } else {
+              toast({
+                title: "Loading...",
+                description: "Sedang memuat data surat, silakan coba lagi dalam beberapa detik.",
+              });
+            }
           }
           // Show interim results while still processing
           else if (interimTranscript) {
@@ -119,7 +140,7 @@ const Qiraati: React.FC = () => {
         variant: "destructive",
       });
     }
-  }, [toast, transcript]);
+  }, [toast, allSurahs]); // Added allSurahs dependency to reinitialize when data is loaded
 
   const startVoiceRecognition = () => {
     if (recognitionRef.current && !isListening) {
@@ -143,55 +164,126 @@ const Qiraati: React.FC = () => {
   };
 
   const handleVoiceSearch = (query: string) => {
-    const normalizedQuery = query.toLowerCase().trim();
-    
-    // Convert number words to digits (Indonesian)
-    const numberMap: { [key: string]: string } = {
-      'satu': '1', 'dua': '2', 'tiga': '3', 'empat': '4', 'lima': '5',
-      'enam': '6', 'tujuh': '7', 'delapan': '8', 'sembilan': '9', 'nol': '0',
-      'sepuluh': '10', 'sebelas': '11', 'dua belas': '12', 'tiga belas': '13',
-      'empat belas': '14', 'lima belas': '15', 'enam belas': '16',
-      'tujuh belas': '17', 'delapan belas': '18', 'sembilan belas': '19',
-      'dua puluh': '20', 'tiga puluh': '30', 'empat puluh': '40',
-      'lima puluh': '50', 'enam puluh': '60', 'tujuh puluh': '70',
-      'delapan puluh': '80', 'sembilan puluh': '90', 'seratus': '100',
-      'tiga puluh enam': '36' // Khusus untuk Yasin
-    };
-
+    if (!query.trim()) {
+      setSearchResults(allSurahs);
+      return;
+    }
     // Convert number words to digits
-    let processedQuery = normalizedQuery;
-    Object.entries(numberMap).forEach(([word, digit]) => {
-      processedQuery = processedQuery.replace(new RegExp(`\\b${word}\\b`, 'g'), digit);
+    const numberWords: { [key: string]: string } = {
+      'satu': '1', 'dua': '2', 'tiga': '3', 'empat': '4', 'lima': '5',
+      'enam': '6', 'tujuh': '7', 'delapan': '8', 'sembilan': '9', 'sepuluh': '10'
+    };
+    let processedQuery = query.toLowerCase();
+    Object.keys(numberWords).forEach(word => {
+      processedQuery = processedQuery.replace(new RegExp(word, 'g'), numberWords[word]);
     });
-    
-    // Remove common prefixes and normalize variations
-    processedQuery = processedQuery
-      .replace(/^(surat|surah|al-|ar-|an-|surat ke|surah ke|nomor|nomer)\s*/i, '')
-      .replace(/\byaasin\b/i, 'yasin')
-      .replace(/\byassin\b/i, 'yasin')
-      .replace(/\byaa sin\b/i, 'yasin')
-      .replace(/\byas sin\b/i, 'yasin')
-      .replace(/\bya sin\b/i, 'yasin')
+    // Fungsi normalisasi string untuk pencarian toleran
+    function normalizeString(str: string) {
+      return str.toLowerCase().replace(/[-\s]/g, '');
+    }
+    function removePrefixes(str: string) {
+      let result = str.trim().toLowerCase();
+      const prefixes = [
+        'surat', 'surah',
+        'al', 'an', 'ar', 'as', 'ash', 'at', 'az', 'ad', 'al-', 'an-', 'ar-', 'as-', 'ash-', 'at-', 'az-', 'ad-'
+      ];
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const prefix of prefixes) {
+          const regex = new RegExp('^' + prefix + '[\s-]*', 'i');
+          if (regex.test(result)) {
+            result = result.replace(regex, '');
+            changed = true;
+          }
+        }
+      }
+      return result.trim();
+    }
+    // Fungsi untuk mengecek apakah string adalah nama surah yang valid
+    function isValidSurahName(str: string) {
+      const validSurahNames = [
+        'al-fatihah', 'al-baqarah', 'al-i\'imran', 'an-nisa', 'al-ma\'idah', 'al-an\'am', 'al-a\'raf', 'al-anfal', 'at-taubah',
+        'yunus', 'hud', 'yusuf', 'ar-ra\'d', 'ibrahim', 'al-hijr', 'an-nahl', 'al-isra', 'al-kahf', 'maryam', 'ta ha',
+        'al-anbiya', 'al-hajj', 'al-mu\'minun', 'an-nur', 'al-furqan', 'ash-shu\'ara', 'an-naml', 'al-qasas', 'al-ankabut',
+        'ar-rum', 'luqman', 'as-sajdah', 'al-ahzab', 'saba', 'fatir', 'ya sin', 'as-saffat', 'sad', 'az-zumar', 'ghafir',
+        'fussilat', 'ash-shura', 'az-zukhruf', 'ad-dukhan', 'al-jathiyah', 'al-ahqaf', 'muhammad', 'al-fath', 'al-hujurat',
+        'qaf', 'ad-dhariyat', 'at-tur', 'an-najm', 'al-qamar', 'ar-rahman', 'al-waqi\'ah', 'al-hadid', 'al-mujadilah',
+        'al-hashr', 'al-mumtahanah', 'as-saff', 'al-jumu\'ah', 'al-munafiqun', 'at-taghabun', 'at-talaq', 'at-tahrim',
+        'al-mulk', 'al-qalam', 'al-haqqah', 'al-ma\'arij', 'nuh', 'al-jinn', 'al-muzzammil', 'al-muddathir', 'al-qiyamah',
+        'al-insan', 'al-mursalat', 'an-naba', 'an-nazi\'at', 'abasa', 'at-takwir', 'al-infitar', 'al-mutaffifin',
+        'al-inshiqaq', 'al-buruj', 'at-tariq', 'al-a\'la', 'al-ghashiyah', 'al-fajr', 'al-balad', 'ash-shams', 'al-layl',
+        'ad-duha', 'ash-sharh', 'at-tin', 'al-\'alaq', 'al-qadr', 'al-bayyinah', 'az-zalzalah', 'al-\'adiyat', 'al-qari\'ah',
+        'at-takathur', 'al-\'asr', 'al-humazah', 'al-fil', 'quraysh', 'al-ma\'un', 'al-kawthar', 'al-kafirun', 'an-nasr',
+        'al-masad', 'al-ikhlas', 'al-falaq', 'an-nas'
+      ];
+      return validSurahNames.includes(str.toLowerCase());
+    }
+    // Normalisasi query: removePrefixes dulu, lalu normalizeString
+    let cleanQuery = processedQuery
+      .replace(/\s+/g, ' ')
+      .replace(/[^\w\s-]/g, '')
       .trim();
-    
-    // Search for matching surahs
-    const results = allSurahs.filter(surah => {
-      const surahNumber = surah.nomor.toString();
-      const namaLatin = surah.namaLatin.toLowerCase();
-      const nama = surah.nama.toLowerCase();
-      const arti = surah.arti.toLowerCase();
+    cleanQuery = removePrefixes(cleanQuery);
+    const normalizedCleanQuery = normalizeString(cleanQuery);
+    // 1. Exact match (prioritas utama) - gunakan urutan normalisasi yang sama
+    let results = allSurahs.filter(surah => {
+      // Untuk data surah, jangan hapus prefix yang merupakan bagian dari nama surah
+      let namaLatinCleaned = surah.namaLatin.toLowerCase();
+      let namaCleaned = surah.nama.toLowerCase();
+      let artiCleaned = surah.arti.toLowerCase();
       
+      // Hanya hapus prefix jika bukan nama surah yang valid
+      if (!isValidSurahName(namaLatinCleaned)) {
+        namaLatinCleaned = removePrefixes(surah.namaLatin);
+      }
+      if (!isValidSurahName(namaCleaned)) {
+        namaCleaned = removePrefixes(surah.nama);
+      }
+      if (!isValidSurahName(artiCleaned)) {
+        artiCleaned = removePrefixes(surah.arti);
+      }
+      
+      const namaLatinNorm = normalizeString(namaLatinCleaned);
+      const namaNorm = normalizeString(namaCleaned);
+      const artiNorm = normalizeString(artiCleaned);
+      const nomor = surah.nomor.toString();
       return (
-        surahNumber === processedQuery ||
-        namaLatin.includes(processedQuery) ||
-        nama.includes(processedQuery) ||
-        arti.includes(processedQuery) ||
-        // Additional checks for number + name combinations
-        `${surahNumber} ${namaLatin}`.includes(processedQuery) ||
-        `${namaLatin} ${surahNumber}`.includes(processedQuery)
+        namaLatinNorm === normalizedCleanQuery ||
+        namaNorm === normalizedCleanQuery ||
+        artiNorm === normalizedCleanQuery ||
+        nomor === cleanQuery
       );
     });
-    
+    // 2. Jika tidak ada exact match, lakukan partial match (tapi query harus cukup spesifik)
+    if (results.length === 0 && normalizedCleanQuery.length > 2) {
+      results = allSurahs.filter(surah => {
+        // Untuk data surah, jangan hapus prefix yang merupakan bagian dari nama surah
+        let namaLatinCleaned = surah.namaLatin.toLowerCase();
+        let namaCleaned = surah.nama.toLowerCase();
+        let artiCleaned = surah.arti.toLowerCase();
+        
+        // Hanya hapus prefix jika bukan nama surah yang valid
+        if (!isValidSurahName(namaLatinCleaned)) {
+          namaLatinCleaned = removePrefixes(surah.namaLatin);
+        }
+        if (!isValidSurahName(namaCleaned)) {
+          namaCleaned = removePrefixes(surah.nama);
+        }
+        if (!isValidSurahName(artiCleaned)) {
+          artiCleaned = removePrefixes(surah.arti);
+        }
+        
+        const namaLatinNorm = normalizeString(namaLatinCleaned);
+        const namaNorm = normalizeString(namaCleaned);
+        const artiNorm = normalizeString(artiCleaned);
+        return (
+          namaLatinNorm.includes(normalizedCleanQuery) ||
+          namaNorm.includes(normalizedCleanQuery) ||
+          artiNorm.includes(normalizedCleanQuery)
+        );
+      });
+    }
     if (results.length > 0) {
       setSearchResults(results);
       toast({
@@ -200,10 +292,39 @@ const Qiraati: React.FC = () => {
       });
     } else {
       setSearchResults([]);
+      // Fallback: cari surah dengan kemiripan tertinggi (Levenshtein distance sederhana)
+      function simpleSimilarity(a: string, b: string) {
+        let max = 0;
+        for (let i = 0; i < a.length; i++) {
+          for (let j = i + 1; j <= a.length; j++) {
+            const sub = a.slice(i, j);
+            if (b.includes(sub) && sub.length > max) max = sub.length;
+          }
+        }
+        return max;
+      }
+      const suggestions = allSurahs
+        .map(surah => {
+          // Untuk data surah, jangan hapus prefix yang merupakan bagian dari nama surah
+          let namaLatinCleaned = surah.namaLatin.toLowerCase();
+          if (!isValidSurahName(namaLatinCleaned)) {
+            namaLatinCleaned = removePrefixes(surah.namaLatin);
+          }
+          const namaLatinNorm = normalizeString(namaLatinCleaned);
+          const score = simpleSimilarity(namaLatinNorm, normalizedCleanQuery);
+          return { surah, score };
+        })
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+        .map(item => item.surah.namaLatin);
+      const suggestionText = suggestions.length > 0 
+        ? `Coba: ${suggestions.join(', ')}` 
+        : 'Coba kata kunci lain seperti: Al-Fatihah, Yasin, Al-Baqarah, Al-Kafirun';
       toast({
         variant: "destructive",
         title: "Tidak Ditemukan",
-        description: `Tidak ada surat yang ditemukan untuk "${query}". Coba kata kunci lain.`,
+        description: `Tidak ada surat yang ditemukan untuk "${query}". ${suggestionText}`,
       });
     }
   };
@@ -213,21 +334,151 @@ const Qiraati: React.FC = () => {
       setSearchResults(allSurahs);
       return;
     }
-    
-    const normalizedQuery = query.toLowerCase().trim();
-    const cleanQuery = normalizedQuery
-      .replace(/^(surat|surah|al-|ar-|an-)\s*/i, '')
+    function normalizeString(str: string) {
+      return str.toLowerCase().replace(/[-\s]/g, '');
+    }
+    function removePrefixes(str: string) {
+      let result = str.trim().toLowerCase();
+      const prefixes = [
+        'surat', 'surah',
+        'al', 'an', 'ar', 'as', 'ash', 'at', 'az', 'ad', 'al-', 'an-', 'ar-', 'as-', 'ash-', 'at-', 'az-', 'ad-'
+      ];
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const prefix of prefixes) {
+          const regex = new RegExp('^' + prefix + '[\s-]*', 'i');
+          if (regex.test(result)) {
+            result = result.replace(regex, '');
+            changed = true;
+          }
+        }
+      }
+      return result.trim();
+    }
+    // Fungsi untuk mengecek apakah string adalah nama surah yang valid
+    function isValidSurahName(str: string) {
+      const validSurahNames = [
+        'al-fatihah', 'al-baqarah', 'al-i\'imran', 'an-nisa', 'al-ma\'idah', 'al-an\'am', 'al-a\'raf', 'al-anfal', 'at-taubah',
+        'yunus', 'hud', 'yusuf', 'ar-ra\'d', 'ibrahim', 'al-hijr', 'an-nahl', 'al-isra', 'al-kahf', 'maryam', 'ta ha',
+        'al-anbiya', 'al-hajj', 'al-mu\'minun', 'an-nur', 'al-furqan', 'ash-shu\'ara', 'an-naml', 'al-qasas', 'al-ankabut',
+        'ar-rum', 'luqman', 'as-sajdah', 'al-ahzab', 'saba', 'fatir', 'ya sin', 'as-saffat', 'sad', 'az-zumar', 'ghafir',
+        'fussilat', 'ash-shura', 'az-zukhruf', 'ad-dukhan', 'al-jathiyah', 'al-ahqaf', 'muhammad', 'al-fath', 'al-hujurat',
+        'qaf', 'ad-dhariyat', 'at-tur', 'an-najm', 'al-qamar', 'ar-rahman', 'al-waqi\'ah', 'al-hadid', 'al-mujadilah',
+        'al-hashr', 'al-mumtahanah', 'as-saff', 'al-jumu\'ah', 'al-munafiqun', 'at-taghabun', 'at-talaq', 'at-tahrim',
+        'al-mulk', 'al-qalam', 'al-haqqah', 'al-ma\'arij', 'nuh', 'al-jinn', 'al-muzzammil', 'al-muddathir', 'al-qiyamah',
+        'al-insan', 'al-mursalat', 'an-naba', 'an-nazi\'at', 'abasa', 'at-takwir', 'al-infitar', 'al-mutaffifin',
+        'al-inshiqaq', 'al-buruj', 'at-tariq', 'al-a\'la', 'al-ghashiyah', 'al-fajr', 'al-balad', 'ash-shams', 'al-layl',
+        'ad-duha', 'ash-sharh', 'at-tin', 'al-\'alaq', 'al-qadr', 'al-bayyinah', 'az-zalzalah', 'al-\'adiyat', 'al-qari\'ah',
+        'at-takathur', 'al-\'asr', 'al-humazah', 'al-fil', 'quraysh', 'al-ma\'un', 'al-kawthar', 'al-kafirun', 'an-nasr',
+        'al-masad', 'al-ikhlas', 'al-falaq', 'an-nas'
+      ];
+      return validSurahNames.includes(str.toLowerCase());
+    }
+    // Normalisasi query: removePrefixes dulu, lalu normalizeString
+    let cleanQuery = query
+      .replace(/\s+/g, ' ')
+      .replace(/[^\w\s-]/g, '')
       .trim();
-    
-    const results = allSurahs.filter(surah => 
-      surah.namaLatin.toLowerCase().includes(cleanQuery) ||
-      surah.nama.toLowerCase().includes(cleanQuery) ||
-      surah.arti.toLowerCase().includes(cleanQuery) ||
-      surah.nomor.toString().includes(cleanQuery)
-    );
-    
-    setSearchResults(results);
-  };
+    cleanQuery = removePrefixes(cleanQuery);
+    const normalizedCleanQuery = normalizeString(cleanQuery);
+    // 1. Exact match (prioritas utama) - gunakan urutan normalisasi yang sama
+    let results = allSurahs.filter(surah => {
+      // Untuk data surah, jangan hapus prefix yang merupakan bagian dari nama surah
+      let namaLatinCleaned = surah.namaLatin.toLowerCase();
+      let namaCleaned = surah.nama.toLowerCase();
+      let artiCleaned = surah.arti.toLowerCase();
+      
+      // Hanya hapus prefix jika bukan nama surah yang valid
+      if (!isValidSurahName(namaLatinCleaned)) {
+        namaLatinCleaned = removePrefixes(surah.namaLatin);
+      }
+      if (!isValidSurahName(namaCleaned)) {
+        namaCleaned = removePrefixes(surah.nama);
+      }
+      if (!isValidSurahName(artiCleaned)) {
+        artiCleaned = removePrefixes(surah.arti);
+      }
+      
+      const namaLatinNorm = normalizeString(namaLatinCleaned);
+      const namaNorm = normalizeString(namaCleaned);
+      const artiNorm = normalizeString(artiCleaned);
+      const nomor = surah.nomor.toString();
+      return (
+        namaLatinNorm === normalizedCleanQuery ||
+        namaNorm === normalizedCleanQuery ||
+        artiNorm === normalizedCleanQuery ||
+        nomor === cleanQuery
+      );
+    });
+    // 2. Jika tidak ada exact match, lakukan partial match (tapi query harus cukup spesifik)
+    if (results.length === 0 && normalizedCleanQuery.length > 2) {
+      results = allSurahs.filter(surah => {
+        // Untuk data surah, jangan hapus prefix yang merupakan bagian dari nama surah
+        let namaLatinCleaned = surah.namaLatin.toLowerCase();
+        let namaCleaned = surah.nama.toLowerCase();
+        let artiCleaned = surah.arti.toLowerCase();
+        
+        // Hanya hapus prefix jika bukan nama surah yang valid
+        if (!isValidSurahName(namaLatinCleaned)) {
+          namaLatinCleaned = removePrefixes(surah.namaLatin);
+        }
+        if (!isValidSurahName(namaCleaned)) {
+          namaCleaned = removePrefixes(surah.nama);
+        }
+        if (!isValidSurahName(artiCleaned)) {
+          artiCleaned = removePrefixes(surah.arti);
+        }
+        
+        const namaLatinNorm = normalizeString(namaLatinCleaned);
+        const namaNorm = normalizeString(namaCleaned);
+        const artiNorm = normalizeString(artiCleaned);
+        return (
+          namaLatinNorm.includes(normalizedCleanQuery) ||
+          namaNorm.includes(normalizedCleanQuery) ||
+          artiNorm.includes(normalizedCleanQuery)
+        );
+      });
+    }
+    if (results.length > 0) {
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+      function simpleSimilarity(a: string, b: string) {
+        let max = 0;
+        for (let i = 0; i < a.length; i++) {
+          for (let j = i + 1; j <= a.length; j++) {
+            const sub = a.slice(i, j);
+            if (b.includes(sub) && sub.length > max) max = sub.length;
+          }
+        }
+        return max;
+      }
+      const suggestions = allSurahs
+        .map(surah => {
+          // Untuk data surah, jangan hapus prefix yang merupakan bagian dari nama surah
+          let namaLatinCleaned = surah.namaLatin.toLowerCase();
+          if (!isValidSurahName(namaLatinCleaned)) {
+            namaLatinCleaned = removePrefixes(surah.namaLatin);
+          }
+          const namaLatinNorm = normalizeString(namaLatinCleaned);
+          const score = simpleSimilarity(namaLatinNorm, normalizedCleanQuery);
+          return { surah, score };
+        })
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+        .map(item => item.surah.namaLatin);
+      const suggestionText = suggestions.length > 0 
+        ? `Coba: ${suggestions.join(', ')}` 
+        : 'Coba kata kunci lain seperti: Al-Fatihah, Yasin, Al-Baqarah, Al-Kafirun';
+      toast({
+        variant: "destructive",
+        title: "Tidak Ditemukan",
+        description: `Tidak ada surat yang ditemukan untuk "${query}". ${suggestionText}`,
+      });
+    }
+  }
 
   const handleSurahClick = (surahId: number) => {
     navigate(`/qiraati/surat/${surahId}`);
@@ -263,6 +514,7 @@ const Qiraati: React.FC = () => {
                 variant={isListening ? "destructive" : "secondary"}
                 onClick={isListening ? stopVoiceRecognition : startVoiceRecognition}
                 className="flex items-center gap-2"
+                disabled={!isDataReady}
               >
                 {isListening ? (
                   <>
@@ -272,11 +524,28 @@ const Qiraati: React.FC = () => {
                 ) : (
                   <>
                     <Mic className="w-4 h-4" />
-                    <span className="hidden sm:inline">Cari dengan Suara</span>
+                    <span className="hidden sm:inline">
+                      {isDataReady ? "Cari dengan Suara" : "Loading..."}
+                    </span>
                   </>
                 )}
               </Button>
             </div>
+            {/* Debug: Show transcript */}
+            {transcript && (
+              <div className="mt-4 p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Transcript:</p>
+                <p className="text-sm font-mono">{transcript}</p>
+              </div>
+            )}
+            {/* Data readiness indicator */}
+            {!isDataReady && (
+              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  ⏳ Sedang memuat data surat... Voice search akan tersedia dalam beberapa detik.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

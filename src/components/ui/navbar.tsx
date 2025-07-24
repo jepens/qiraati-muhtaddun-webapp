@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Clock, Users, Info, Image, LogIn } from 'lucide-react';
+import { Home, BookOpen, Clock, Users, Info, Image, LogIn, Gamepad2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigationItems = [
   { name: 'Beranda', path: '/', icon: Home },
   { name: 'Qiraati', path: '/qiraati', icon: BookOpen },
+  { name: 'Game Hafalan', path: '/game-hafalan', icon: Gamepad2 },
   { name: 'Jadwal Sholat', path: '/jadwal-sholat', icon: Clock },
   { name: 'Kegiatan', path: '/kegiatan', icon: Users },
   { name: 'Galeri', path: '/galeri', icon: Image },
