@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Clock, MapPin, Sunrise, Sun, Sunset, Moon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { API_BASE_URL } from '@/lib/config';
 
 interface PrayerTime {
   imsak: string;
@@ -39,7 +40,7 @@ interface PrayerScheduleResponse {
 }
 
 // Backend API base URL
-const API_BASE_URL = 'http://localhost:3001';
+// const API_BASE_URL = 'http://localhost:3001';
 
 const JadwalSholat: React.FC = () => {
   const [prayerTimes, setPrayerTimes] = useState<PrayerTime | null>(null);
