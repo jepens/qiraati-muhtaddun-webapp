@@ -12,6 +12,7 @@ const Qiraati: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [transcript, setTranscript] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ const Qiraati: React.FC = () => {
   // Initialize Speech Recognition
   React.useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       
@@ -43,6 +45,7 @@ const Qiraati: React.FC = () => {
           });
         };
         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         recognitionRef.current.onresult = (event: any) => {
           let finalTranscript = '';
           let interimTranscript = '';
@@ -70,6 +73,7 @@ const Qiraati: React.FC = () => {
           }
         };
         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         recognitionRef.current.onerror = (event: any) => {
           console.error('Speech recognition error:', event.error);
           setIsListening(false);

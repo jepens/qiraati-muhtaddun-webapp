@@ -82,7 +82,7 @@ const Kegiatan: React.FC = () => {
             <SelectItem value="lainnya">Lainnya</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+        <Select value={sortBy} onValueChange={(value: 'date' | 'category') => setSortBy(value)}>
           <SelectTrigger>
             <SelectValue placeholder="Urutkan berdasarkan" />
           </SelectTrigger>
