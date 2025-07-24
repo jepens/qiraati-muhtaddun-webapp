@@ -1,13 +1,8 @@
-version: '3.8'
-
 services:
   qiraati-webapp:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: qiraati-muhtaddun-webapp
-    ports:
-      - "${PORT:-80}:80"
     environment:
       - NODE_ENV=production
     restart: unless-stopped
@@ -28,9 +23,6 @@ services:
     build:
       context: ./backend-example
       dockerfile: Dockerfile
-    container_name: qiraati-api
-    ports:
-      - "${API_PORT:-3001}:3001"
     environment:
       - NODE_ENV=production
     restart: unless-stopped
