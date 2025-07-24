@@ -1,12 +1,12 @@
 // API Configuration
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Quran API endpoints
 export const QURAN_API = {
-  SURAH_LIST: `${API_BASE_URL}/api/quran/surat`,
-  SURAH_DETAIL: (id: string | number) => `${API_BASE_URL}/api/quran/surat/${id}`,
+  SURAH_LIST: `${API_BASE_URL}/quran/surat`,
+  SURAH_DETAIL: (id: string | number) => `${API_BASE_URL}/quran/surat/${id}`,
   PRAYER_TIMES: (year: number, month: string, date: string) => 
-    `${API_BASE_URL}/api/prayer-times/${year}/${month}/${date}`,
+    `${API_BASE_URL}/prayer-times/${year}/${month}/${date}`,
 };
 
 // Cache configuration

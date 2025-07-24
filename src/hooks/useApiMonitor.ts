@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { API_BASE_URL } from '@/lib/config';
 
 export interface ApiStatus {
   name: string;
@@ -21,14 +22,14 @@ export const useApiMonitor = () => {
     },
     {
       name: 'Backend API',
-      url: 'http://localhost:3001',
+      url: API_BASE_URL,
       status: 'checking',
       responseTime: null,
       lastChecked: null,
     },
     {
       name: 'Quran API (Surah List)',
-      url: 'http://localhost:3001/api/quran/surat',
+      url: `${API_BASE_URL}/quran/surat`,
       status: 'checking',
       responseTime: null,
       lastChecked: null,
@@ -122,7 +123,7 @@ export const useApiMonitor = () => {
     try {
       const startTime = Date.now();
       // Try to connect to the backend server, using an endpoint that should exist
-      const response = await fetch('http://localhost:3001/api/quran/surat', {
+      const response = await fetch(`${API_BASE_URL}/quran/surat`, {
         method: 'GET',
         signal: controller.signal,
       });
@@ -167,7 +168,7 @@ export const useApiMonitor = () => {
       const date = String(now.getDate()).padStart(2, '0');
       
       const response = await fetch(
-        `http://localhost:3001/api/prayer-times/${year}/${month}/${date}`,
+        `${API_BASE_URL}/prayer-times/${year}/${month}/${date}`,
         {
           signal: controller.signal,
         }
@@ -215,7 +216,7 @@ export const useApiMonitor = () => {
     const checks = [
       { index: 0, checker: checkSupabaseStatus },
       { index: 1, checker: checkBackendApiStatus },
-      { index: 2, checker: () => checkApiEndpoint('http://localhost:3001/api/quran/surat') },
+      { index: 2, checker: () => checkApiEndpoint(`${API_BASE_URL}/quran/surat`) },
       { index: 3, checker: checkPrayerTimesApi },
     ];
 

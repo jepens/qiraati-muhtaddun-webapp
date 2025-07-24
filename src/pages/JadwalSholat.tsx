@@ -74,7 +74,7 @@ const JadwalSholat: React.FC = () => {
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const date = String(now.getDate()).padStart(2, '0');
         
-        const response = await fetch(`${API_BASE_URL}/api/prayer-times/${year}/${month}/${date}`);
+        const response = await fetch(`${API_BASE_URL}/prayer-times/${year}/${month}/${date}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch prayer times');
