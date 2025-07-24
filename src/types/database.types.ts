@@ -40,6 +40,7 @@ export interface AboutContent {
   phone: string;
   email: string;
   office_hours: string;
+  google_maps_embed?: string;
   created_at: string;
   updated_at: string;
 }

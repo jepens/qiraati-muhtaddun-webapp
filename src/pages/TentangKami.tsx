@@ -200,6 +200,25 @@ const TentangKami: React.FC = () => {
               </div>
             </div>
 
+            {/* Google Maps */}
+            {content?.google_maps_embed && (
+              <div className="mt-8">
+                <h4 className="text-elderly-lg font-semibold mb-4 text-center">Lokasi Masjid</h4>
+                <div className="w-full h-80 rounded-lg overflow-hidden border-2 border-primary/20">
+                  <iframe
+                    src={content.google_maps_embed}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    title="Lokasi Masjid Al-Muhtaddun"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="mt-8 text-center">
               <div className="arabic-text text-2xl text-primary font-semibold mb-2">
                 بَارَكَ اللَّهُ فِيكُمْ

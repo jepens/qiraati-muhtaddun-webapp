@@ -209,6 +209,38 @@ const AboutManager: React.FC = () => {
               </div>
             </div>
 
+            {/* Google Maps Embed */}
+            <div className="space-y-2">
+              <Label htmlFor="google_maps_embed">Google Maps Embed URL</Label>
+              <Input
+                id="google_maps_embed"
+                value={content?.google_maps_embed || ''}
+                onChange={(e) => setContent(prev => ({ ...prev!, google_maps_embed: e.target.value }))}
+                placeholder="Masukkan URL embed Google Maps..."
+              />
+              <p className="text-sm text-muted-foreground">
+                Cara mendapatkan URL embed: Buka Google Maps → Cari lokasi masjid → Klik "Share" → Pilih "Embed a map" → Copy URL
+              </p>
+            </div>
+
+            {/* Preview Google Maps */}
+            {content?.google_maps_embed && (
+              <div className="space-y-2">
+                <Label>Preview Peta</Label>
+                <div className="w-full h-64 border rounded-md overflow-hidden">
+                  <iframe
+                    src={content.google_maps_embed}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end">
               <Button type="submit" disabled={saving}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Clock, Users, Info, Image } from 'lucide-react';
+import { Home, BookOpen, Clock, Users, Info, Image, LogIn } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigationItems = [
@@ -10,6 +10,7 @@ const navigationItems = [
   { name: 'Kegiatan', path: '/kegiatan', icon: Users },
   { name: 'Galeri', path: '/galeri', icon: Image },
   { name: 'Tentang Kami', path: '/tentang-kami', icon: Info },
+  { name: 'Login', path: '/login', icon: LogIn },
 ];
 
 export const Navbar = () => {
