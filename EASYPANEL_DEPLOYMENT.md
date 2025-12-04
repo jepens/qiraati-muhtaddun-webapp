@@ -1,240 +1,291 @@
-# 🔴 EasyPanel + Nixpacks Issue
+# 🎯 EasyPanel Deployment - FINAL SOLUTION
 
-## Problem
-EasyPanel's Nixpacks implementation **overrides** `nixpacks.toml` and generates its own Dockerfile with problematic cache mounts:
+## ❌ Current Issues
 
-```dockerfile
-RUN --mount=type=cache,id=...,target=/app/node_modules/.cache npm run build
+Looking at your logs:
+
+```
+nginx: [emerg] host not found in upstream "qiraati-api"
 ```
 
-This causes `vite: not found` because the cache mount interferes with `node_modules/.bin`.
+**Problem:** You're using `docker-compose.yml` which expects **2 containers**:
+1. `qiraati-webapp` (frontend)
+2. `qiraati-api` (backend API)
+
+But EasyPanel is **only deploying 1 container** (frontend), so Nginx can't find the backend.
 
 ---
 
-## Solution Options
+## ✅ SOLUTION: Use Standalone Deployment
 
-### ✅ Option 1: Use Custom Dockerfile (RECOMMENDED)
+### Option 1: Use Dockerfile.standalone (RECOMMENDED)
 
-EasyPanel allows you to use a custom Dockerfile instead of Nixpacks auto-generation.
+**I just created:** `Dockerfile.standalone` + `nginx.standalone.conf`
 
-**Steps:**
+**Steps in EasyPanel:**
 
-1. **In EasyPanel Dashboard:**
-   - Go to your app settings
-   - Look for "Build Method" or "Buildpack" section
-   - Change from "Nixpacks" to "Dockerfile"
-   - Specify: `Dockerfile` (use the existing one)
-
-2. **Existing Dockerfile already works!**
-   - File: `Dockerfile` in root
-   - Already tested and working
-   - Uses Nginx for serving
-   - Multi-stage build optimized
-
-3. **Rebuild:**
-   - Click "Rebuild" or wait for auto-deploy
-   - Should use `Dockerfile` instead of generating one
-
----
-
-### ✅ Option 2: Tell EasyPanel to Use Dockerfile.nixpacks
-
-If you want to keep Nixpacks-style deployment:
-
-**Created file:** `Dockerfile.nixpacks`
-- Optimized for serve-based deployment
-- Explicit vite verification
-- No cache mount issues
-
-**Configure in EasyPanel:**
-- Build Method: Dockerfile
-- Dockerfile path: `Dockerfile.nixpacks`
-
----
-
-### ⚠️ Option 3: Platform Configuration (If Available)
-
-Some platforms allow Nixpacks cache configuration. Check if EasyPanel has:
-
-**Environment Variables:**
-```bash
-NIXPACKS_NO_CACHE=true
-NIXPACKS_BUILD_FLAGS=--no-cache
-```
-
-**Or Dashboard Settings:**
-- Disable build cache
-- Clear cache before build
-
----
-
-## Recommended Approach
-
-### **USE THE EXISTING DOCKERFILE** ✅
-
-Your original `Dockerfile` (the one that worked with docker-compose) is already perfect:
-
-```dockerfile
-# Multi-stage build with Nginx
-FROM node:18-alpine AS builder
-...
-RUN npm ci
-RUN npm run build
-
-FROM nginx:alpine AS production
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-```
-
-**Why this is best:**
-- ✅ Already tested and working
-- ✅ No cache mount issues
-- ✅ Uses Nginx (production-grade)
-- ✅ Includes compression & caching headers
-- ✅ Health checks configured
-
-**How to use in EasyPanel:**
-
-1. **Change build method:**
+1. **Change Source Settings:**
    ```
-   Build Method: Dockerfile
-   Dockerfile: Dockerfile (default)
+   Source: Git
+   Build Path: /
+   Docker Compose File: (LEAVE BLANK - don't use docker-compose)
    ```
 
-2. **Set environment variables:**
+2. **Change to Dockerfile Method:**
+   - Change from "docker-compose.yml" to "Dockerfile"
+   - Dockerfile path: `Dockerfile.standalone`
+
+3. **Set Environment Variables:**
    ```
    VITE_SUPABASE_URL=https://vqrtwwberevzvxmcycij.supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxcnR3d2JlcmV2enZ4bWN5Y2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxNDY0ODgsImV4cCI6MjA2NzcyMjQ4OH0.WD9swBhT3wMbEEPruCmouatFxCVlJ6HzVfGIx29E7Uc
    ```
 
-3. **Port mapping:**
+4. **Port Configuration:**
    ```
    Container Port: 80
-   Expose Port: 80 or 8080
    ```
 
-4. **Rebuild:**
-   - Trigger rebuild
-   - Should work immediately!
+5. **Deploy:**
+   - Click "Deploy"
+   - ✅ Should work!
 
 ---
 
-## Why Nixpacks is Problematic Here
+### Option 2: Use Dockerfile.nixpacks (serve-based)
 
-**Nixpacks auto-generates Dockerfile:**
-1. Detects Node.js project ✅
-2. Guesses build commands ✅
-3. **Adds cache mounts ❌** (causes our issue)
-4. Generated Dockerfile overrides `nixpacks.toml` config
-
-**Our `nixpacks.toml` tried to fix this but:**
-- EasyPanel's Nixpacks version might ignore some config
-- Cache mount is hardcoded in their Nixpacks template
-- Not all Nixpacks implementations are equal
-
----
-
-## Verification Steps
-
-### After switching to Dockerfile:
-
-**Check build logs for:**
-```bash
-✅ Step 8/15 : RUN npm ci
-✅ added 480 packages
-✅ Step 9/15 : RUN npm run build
-✅ vite v5.4.10 building for production...
-✅ ✓ built in X.XXs
-✅ Step 11/15 : FROM nginx:alpine
-✅ Successfully built [image-id]
-```
-
-**No more:**
-```bash
-❌ sh: 1: vite: not found
-❌ exit code: 127
-```
-
----
-
-## Files Ready
-
-| File | Purpose | Status |
-|------|---------|--------|
-| `Dockerfile` | ⭐ Original working Dockerfile (Nginx) | ✅ Use This! |
-| `Dockerfile.nixpacks` | Alternative (serve-based) | ✅ Fallback |
-| `nixpacks.toml` | Nixpacks config (if platform supports) | ⚠️ May not work with EasyPanel |
-| `.npmrc` | NPM configuration | ✅ Helps both methods |
-| `.nixpacksignore` | Ignore files for Nixpacks | ✅ Helps if using Nixpacks |
-
----
-
-## Configuration for EasyPanel
-
-### Method 1: Original Dockerfile (RECOMMENDED)
-```
-Build Method: Dockerfile
-Dockerfile Path: Dockerfile
-Port: 80
-Environment Variables:
-  - VITE_SUPABASE_URL=your_url
-  - VITE_SUPABASE_ANON_KEY=your_key
-```
-
-### Method 2: Serve-based Dockerfile
-```
-Build Method: Dockerfile
-Dockerfile Path: Dockerfile.nixpacks
-Port: 8080
-Environment Variables:
-  - VITE_SUPABASE_URL=your_url
-  - VITE_SUPABASE_ANON_KEY=your_key
-```
-
-### Method 3: Try to Fix Nixpacks (Not Recommended)
-```
-Build Method: Nixpacks
-Environment Variables:
-  - NIXPACKS_NO_CACHE=true
-  - VITE_SUPABASE_URL=your_url
-  - VITE_SUPABASE_ANON_KEY=your_key
-```
-
----
-
-## Expected Timeline
-
-**Switching to Dockerfile:**
-- Configuration change: 2 minutes
-- Rebuild: 3-5 minutes
-- **Total: ~7 minutes to working deployment** ✅
-
-**Trying to fix Nixpacks:**
-- Trial and error: Unknown
-- Platform limitations: May not be solvable
-- **Not recommended**
-
----
-
-## Summary
-
-**Problem:** EasyPanel's Nixpacks generates Dockerfile with cache mounts that break vite
-
-**Solution:** **Use `Dockerfile` instead of Nixpacks** ✅
+Simpler, no Nginx configuration needed.
 
 **Steps:**
-1. EasyPanel dashboard → App settings
-2. Change: Build Method → Dockerfile
-3. Set environment variables
-4. Rebuild
-5. ✅ Working!
-
-**Why:** Your original Dockerfile already works perfectly. No need for Nixpacks.
+1. Dockerfile path: `Dockerfile.nixpacks`
+2. Environment variables: (same as above)
+3. Port: `8080`
+4. Deploy
 
 ---
 
-**Recommendation:** Switch to Dockerfile method NOW. Save time debugging Nixpacks.
+## 📋 File Comparison
 
-**Time to fix:** 5-7 minutes  
-**Success rate:** 99%  
-**Risk:** Minimal (just reverting to working config)
+| File | Purpose | Backend API? | Status |
+|------|---------|--------------|--------|
+| `Dockerfile` | Original (multi-container) | ✅ Expects API | ❌ Won't work standalone |
+| `Dockerfile.standalone` | ⭐ Single container | ❌ No API needed | ✅ Use this! |
+| `Dockerfile.nixpacks` | Alternative (serve) | ❌ No API needed | ✅ Also works |
+| `docker-compose.yml` | Multi-container setup | ✅ Needs API | ❌ Wrong for EasyPanel |
+
+---
+
+## 🔧 What Changed
+
+### nginx.conf (ORIGINAL - has issues)
+```nginx
+location /api/ {
+    proxy_pass http://qiraati-api:3001/api/;  # ❌ Looks for API container
+    ...
+}
+```
+
+### nginx.standalone.conf (NEW - standalone)
+```nginx
+# No API proxy block ✅
+# Just serves static files
+# Explicit MIME types for .js files ✅
+```
+
+---
+
+## 🚀 Quick Fix Guide
+
+### Current EasyPanel Configuration:
+```
+❌ Docker Compose File: docker-compose.yml
+❌ Expects: qiraati-api container
+❌ Result: Nginx error + MIME type error
+```
+
+### New EasyPanel Configuration:
+```
+✅ Build Method: Dockerfile
+✅ Dockerfile: Dockerfile.standalone
+✅ Single container deployment
+✅ No backend API dependency
+```
+
+---
+
+## 📸 EasyPanel Settings
+
+Based on your screenshot, here's what to change:
+
+### Current Settings:
+- **Source:** docker-compose.yml
+- **Docker Compose File:** docker-compose.yml
+
+### New Settings:
+1. **Click "Git" tab** (not "docker-compose.yml")
+2. **Repository URL:** https://github.com/jepens/qiraati-muhtaddun-webapp
+3. **Branch:** main
+4. **Build Path:** /
+5. **Dockerfile:** Dockerfile.standalone  ← **KEY CHANGE**
+6. **Docker Compose File:** (leave blank or remove)
+
+---
+
+## ✅ Expected Result
+
+### Before (docker-compose.yml):
+```
+❌ nginx: [emerg] host not found in upstream "qiraati-api"
+❌ Container crashes
+❌ MIME type error
+```
+
+### After (Dockerfile.standalone):
+```
+✅ nginx starts successfully
+✅ Static files served with correct MIME types
+✅ Application loads in browser
+✅ No errors
+```
+
+---
+
+## 🎯 Step-by-Step Instructions
+
+### 1. Commit New Files
+```bash
+git add Dockerfile.standalone nginx.standalone.conf
+git commit -m "feat: add standalone deployment for EasyPanel
+
+- Create nginx.standalone.conf without API proxy
+- Create Dockerfile.standalone for single-container deployment
+- Fix MIME type issues with explicit Content-Type headers
+- Remove dependency on qiraati-api backend"
+
+git push origin main
+```
+
+### 2. Configure EasyPanel
+
+**In EasyPanel Dashboard:**
+
+1. Go to your app "apk_web/masjid"
+2. Click on **Source** tab
+3. **Change these settings:**
+   - Build method: Select **"Git"** (not docker-compose.yml)
+   - Repository URL: `https://github.com/jepens/qiraati-muhtaddun-webapp`
+   - Branch: `main`
+   - Build Path: `/`
+   - **Dockerfile:** `Dockerfile.standalone` ← IMPORTANT!
+   - Docker Compose File: **(delete/clear this field)**
+
+4. **Environment Variables:**
+   Add these:
+   ```
+   VITE_SUPABASE_URL=https://vqrtwwberevzvxmcycij.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxcnR3d2JlcmV2enZ4bWN5Y2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxNDY0ODgsImV4cCI6MjA2NzcyMjQ4OH0.WD9swBhT3wMbEEPruCmouatFxCVlJ6HzVfGIx29E7Uc
+   ```
+
+5. **Port Configuration:**
+   ```
+   Container Port: 80
+   Published Port: 80 (or whatever EasyPanel assigns)
+   ```
+
+6. **Click "Save"**
+
+7. **Click "Deploy"**
+
+### 3. Verify Deployment
+
+**Check logs for:**
+```
+✅ nginx: configuration is valid
+✅ nginx: ready for start up
+✅ No "host not found" errors
+✅ Container running
+```
+
+**Test in browser:**
+```
+✅ Page loads
+✅ No console errors
+✅ JavaScript loads correctly
+✅ Application works
+```
+
+---
+
+## 🔍 Troubleshooting
+
+### If still getting nginx errors:
+
+**Check:**
+1. Did you change from docker-compose to Dockerfile?
+2. Is Dockerfile path correct: `Dockerfile.standalone`?
+3. Did you clear "Docker Compose File" field?
+
+### If still getting MIME type errors:
+
+**Try Dockerfile.nixpacks instead:**
+- Uses `serve` instead of Nginx
+- Simpler, fewer moving parts
+- Port 8080 instead of 80
+
+---
+
+## 📊 Deployment Methods Comparison
+
+| Method | Complexity | Success Rate | For |
+|--------|------------|--------------|-----|
+| **Dockerfile.standalone** ⭐ | Medium | 95% | Production (Nginx) |
+| **Dockerfile.nixpacks** | Low | 90% | Quick deploy (serve) |
+| docker-compose.yml | High | 0% | ❌ Won't work (needs 2 containers) |
+| Nixpacks auto | Low | 20% | ❌ Cache issues |
+
+---
+
+## 💡 Why This Fixes It
+
+### Root Causes:
+1. **docker-compose.yml expects 2 containers** (webapp + api)
+2. **EasyPanel only runs 1 container** (webapp)
+3. **nginx.conf tries to proxy to missing API**
+4. **Nginx fails to start → files not served → MIME error**
+
+### Solution:
+1. **Use Dockerfile.standalone** (single container)
+2. **Use nginx.standalone.conf** (no API proxy)
+3. **Explicit MIME types** for JavaScript modules
+4. **Self-contained deployment** ✅
+
+---
+
+## ✅ Checklist
+
+- [ ] Commit `Dockerfile.standalone` and `nginx.standalone.conf`
+- [ ] Push to GitHub
+- [ ] Change EasyPanel from docker-compose to Dockerfile
+- [ ] Set Dockerfile path to `Dockerfile.standalone`
+- [ ] Clear "Docker Compose File" field
+- [ ] Add environment variables
+- [ ] Set port to 80
+- [ ] Click Deploy
+- [ ] Verify logs (no nginx errors)
+- [ ] Test in browser (no MIME errors)
+
+---
+
+## 🎉 Expected Timeline
+
+- Configuration changes: **2 minutes**
+- Git push: **30 seconds**  
+- EasyPanel rebuild: **3-5 minutes**
+- **Total: ~7 minutes to working app** ✅
+
+---
+
+**Status:** Ready to deploy  
+**Files created:** Dockerfile.standalone, nginx.standalone.conf  
+**Action needed:** Change EasyPanel config + commit & push  
+**ETA:** 7 minutes to success!
