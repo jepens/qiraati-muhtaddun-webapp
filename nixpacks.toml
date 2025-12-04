@@ -2,12 +2,19 @@
 nixPkgs = ["nodejs_18"]
 
 [phases.install]
-# Use npm install instead of npm ci to avoid cache issues
-cmds = ["npm install --legacy-peer-deps"]
+# Install with explicit flags to avoid cache issues
+cmds = [
+  "npm config set cache /tmp/npm-cache --global",
+  "npm install --prefer-offline --no-audit --legacy-peer-deps"
+]
 
 [phases.build]
-# Ensure node_modules/.bin is in PATH
-cmds = ["npm run build"]
+# Explicit PATH and verification before build
+cmds = [
+  "export PATH=\"$PWD/node_modules/.bin:$PATH\"",
+  "which vite || npm install vite",
+  "npm run build"
+]
 
 [start]
 cmd = "npx serve dist -s -l 8080"
@@ -15,3 +22,4 @@ cmd = "npx serve dist -s -l 8080"
 [variables]
 NODE_ENV = "production"
 NPM_CONFIG_CACHE = "/tmp/npm-cache"
+PATH = "/app/node_modules/.bin:$PATH"
