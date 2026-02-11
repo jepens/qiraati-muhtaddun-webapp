@@ -1,5 +1,5 @@
 services:
-  qiraati-webapp-v2:
+  qiraati-webapp:
     build:
       context: .
       dockerfile: Dockerfile
@@ -15,7 +15,7 @@ services:
     networks:
       - qiraati-network
     labels:
-      - "com.docker.compose.service=qiraati-webapp-v2"
+      - "com.docker.compose.service=qiraati-webapp"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost/" ]
       interval: 30s
