@@ -1,13 +1,10 @@
-version: '3.8'
-
 services:
   qiraati-webapp:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: qiraati-muhtaddun-webapp
-    ports:
-      - "${PORT:-80}:80"
+    expose:
+      - "80"
     environment:
       - NODE_ENV=production
     restart: unless-stopped
@@ -40,9 +37,8 @@ services:
     build:
       context: ./backend-example
       dockerfile: Dockerfile
-    container_name: qiraati-api
-    ports:
-      - "${API_PORT:-3001}:3000"
+    expose:
+      - "3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -80,7 +76,6 @@ services:
 networks:
   qiraati-network:
     driver: bridge
-    name: qiraati-network
 
 # Volumes untuk data persistence (jika diperlukan)
 # volumes:
