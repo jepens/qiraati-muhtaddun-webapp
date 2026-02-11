@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, Pause, Volume2, VolumeX, Plus, Minus, ScrollText, FastForward } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Volume2, VolumeX, Plus, Minus, ScrollText, FastForward, ScanFace } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSurahDetail } from '@/hooks/useQuran';
-
+import { useFaceScroll } from '@/hooks/useFaceScroll';
+import { useVoiceControl } from '@/hooks/useVoiceControl';
+import SmartReaderOverlay from '@/components/SmartReaderOverlay';
 
 const scrollSpeeds = {
   slow: 80,
@@ -32,8 +34,9 @@ const SurahDetail: React.FC = () => {
   const [autoScroll, setAutoScroll] = useState(false);
   const [scrollSpeed, setScrollSpeed] = useState<'slow' | 'medium' | 'fast'>('medium');
   const [scrollProgress, setScrollProgress] = useState(0);
-  const ayatListRef = useRef<HTMLDivElement>(null);
+  const [isSmartMode, setIsSmartMode] = useState(false);
 
+  const ayatListRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const ayatAudioRefs = useRef<Record<number, HTMLAudioElement>>({});
 
@@ -152,6 +155,40 @@ const SurahDetail: React.FC = () => {
       };
     }
   };
+
+  // Smart Reader Hooks integration
+  const { videoRef, isReady: isFaceReady, error: faceError, debugRefs } = useFaceScroll({
+    enabled: isSmartMode,
+    onScroll: (speed) => {
+      if (ayatListRef.current) {
+        ayatListRef.current.scrollTop += speed;
+      }
+    }
+  });
+
+  const { isListening, error: voiceError } = useVoiceControl({
+    enabled: isSmartMode,
+    onCommand: (command) => {
+      switch (command) {
+        case 'play':
+          playFullSurah();
+          break;
+        case 'pause':
+        case 'stop':
+          if (audioRef.current) {
+            audioRef.current.pause();
+            setIsPlayingFull(false);
+          }
+          setPlayingAyat(null);
+          Object.values(ayatAudioRefs.current).forEach(audio => audio.pause());
+          setAutoScroll(false);
+          break;
+        case 'scroll':
+          setAutoScroll(true);
+          break;
+      }
+    }
+  });
 
   const handleFontSizeChange = (newSize: typeof fontSize) => {
     setFontSize(newSize);
@@ -358,9 +395,44 @@ const SurahDetail: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                {/* Smart Reader Toggle */}
+                <div className="space-y-2 pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium flex items-center gap-2">
+                      <ScanFace className="w-4 h-4 text-primary" />
+                      Smart Reader
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {isSmartMode ? 'Aktif' : 'Nonaktif'}
+                    </span>
+                  </div>
+                  <Button
+                    variant={isSmartMode ? "default" : "outline"}
+                    onClick={() => setIsSmartMode(!isSmartMode)}
+                    className="w-full flex items-center gap-2 justify-center"
+                  >
+                    <ScanFace className="w-4 h-4" />
+                    <span>{isSmartMode ? 'Matikan Smart Mode' : 'Aktifkan Smart Reader'}</span>
+                  </Button>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Scroll dengan anggukan kepala & kontrol suara.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {isSmartMode && (
+            <SmartReaderOverlay
+              videoRef={videoRef}
+              isReady={isFaceReady}
+              isListening={isListening}
+              error={faceError || voiceError}
+              debugRefs={debugRefs}
+              onClose={() => setIsSmartMode(false)}
+            />
+          )}
 
           {/* Ayat List with improved styling */}
           <div
