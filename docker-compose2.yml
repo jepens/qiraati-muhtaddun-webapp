@@ -16,7 +16,7 @@ services:
     labels:
       - "com.docker.compose.service=qiraati-webapp"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
+      test: [ "CMD", "curl", "-f", "http://localhost/" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -36,32 +36,31 @@ services:
         max-file: "3"
 
   # Backend API (uncomment jika diperlukan)
-  # qiraati-api:
-  #   build:
-  #     context: ./backend-example
-  #     dockerfile: Dockerfile
-  #   container_name: qiraati-api
-  #   ports:
-  #     - "${API_PORT:-3001}:3000"
-  #   environment:
-  #     - NODE_ENV=production
-  #     - PORT=3000
-  #   restart: unless-stopped
-  #   networks:
-  #     - qiraati-network
-  #   depends_on:
-  #     - qiraati-webapp
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 256M
-  #         cpus: '0.25'
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "5m"
-  #       max-file: "3"
-
+  qiraati-api:
+    build:
+      context: ./backend-example
+      dockerfile: Dockerfile
+    container_name: qiraati-api
+    ports:
+      - "${API_PORT:-3001}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    networks:
+      - qiraati-network
+    depends_on:
+      - qiraati-webapp
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
   # Nginx Reverse Proxy (uncomment jika ingin menggunakan)
   # nginx-proxy:
   #   image: nginx:alpine
