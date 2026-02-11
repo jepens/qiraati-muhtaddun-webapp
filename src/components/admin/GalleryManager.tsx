@@ -1,5 +1,5 @@
 import React from 'react';
-import { useGallery } from '@/hooks/useGallery';
+import { useGallery } from '@/hooks/use-gallery';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,7 +33,7 @@ const GalleryManager = () => {
       alert('Mohon lengkapi semua field yang diperlukan');
       return;
     }
-    
+
     const albumData = {
       title: selectedAlbum.title,
       description: selectedAlbum.description,
@@ -43,7 +43,10 @@ const GalleryManager = () => {
     if (isNewAlbum) {
       addAlbum(albumData);
     } else if (selectedAlbum.id) {
-      updateAlbum({ ...albumData, id: selectedAlbum.id });
+      const originalAlbum = albums.find(a => a.id === selectedAlbum.id);
+      if (originalAlbum) {
+        updateAlbum({ ...originalAlbum, ...albumData });
+      }
     }
     setSelectedAlbum(null);
     setIsNewAlbum(false);
@@ -70,7 +73,7 @@ const GalleryManager = () => {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const reader = new FileReader();
-      
+
       const result = await new Promise((resolve) => {
         reader.onloadend = () => resolve(reader.result);
         reader.readAsDataURL(file);
@@ -184,6 +187,7 @@ const GalleryManager = () => {
                         size="icon"
                         className="text-white hover:bg-white/20"
                         onClick={() => handlePhotoClick(photo, album)}
+                        aria-label="Lihat foto"
                       >
                         <Eye className="w-5 h-5" />
                       </Button>
@@ -192,6 +196,7 @@ const GalleryManager = () => {
                         size="icon"
                         className="text-white hover:bg-white/20"
                         onClick={() => deletePhotoFromAlbum(album.id, photo.id)}
+                        aria-label="Hapus foto"
                       >
                         <Trash className="w-5 h-5" />
                       </Button>
@@ -292,6 +297,7 @@ const GalleryManager = () => {
               size="icon"
               className="absolute top-2 right-2"
               onClick={() => setPreviewPhoto(null)}
+              aria-label="Tutup preview"
             >
               <X className="w-5 h-5" />
             </Button>

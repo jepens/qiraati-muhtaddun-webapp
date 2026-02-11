@@ -39,11 +39,12 @@ export const Navbar = () => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path ||
                 (item.path === '/qiraati' && location.pathname.startsWith('/qiraati'));
-              
+
               return (
                 <Link
                   key={item.path}
                   to={item.path}
+                  aria-label={item.name}
                   className={cn(
                     "flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all duration-300",
                     "text-elderly hover:transform hover:scale-105",

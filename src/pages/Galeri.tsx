@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useGallery } from '@/hooks/useGallery';
+import { useGallery } from '@/hooks/use-gallery';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut } from 'lucide-react';
@@ -17,35 +17,35 @@ const Galeri = () => {
   const currentAlbum = albums.find(album => album.id === selectedAlbum);
   const isFullscreenMode = selectedPhotoIndex !== null && currentAlbum;
 
-  const handlePrevPhoto = () => {
+  const handleClose = React.useCallback(() => {
+    setSelectedPhotoIndex(null);
+    setSelectedAlbum(null);
+    setIsZoomed(false);
+  }, []);
+
+  const handlePrevPhoto = React.useCallback(() => {
     if (selectedPhotoIndex === null || !currentAlbum) return;
-    setSelectedPhotoIndex(
-      selectedPhotoIndex === 0 ? currentAlbum.photos!.length - 1 : selectedPhotoIndex - 1
+    setSelectedPhotoIndex((prev) =>
+      prev === 0 ? currentAlbum.photos!.length - 1 : prev! - 1
     );
     setIsZoomed(false);
-  };
+  }, [selectedPhotoIndex, currentAlbum]);
 
-  const handleNextPhoto = () => {
+  const handleNextPhoto = React.useCallback(() => {
     if (selectedPhotoIndex === null || !currentAlbum) return;
-    setSelectedPhotoIndex(
-      selectedPhotoIndex === currentAlbum.photos!.length - 1 ? 0 : selectedPhotoIndex + 1
+    setSelectedPhotoIndex((prev) =>
+      prev === currentAlbum.photos!.length - 1 ? 0 : prev! + 1
     );
     setIsZoomed(false);
-  };
+  }, [selectedPhotoIndex, currentAlbum]);
 
-  const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = React.useCallback((e: KeyboardEvent) => {
     if (isFullscreenMode) {
       if (e.key === 'ArrowLeft') handlePrevPhoto();
       if (e.key === 'ArrowRight') handleNextPhoto();
       if (e.key === 'Escape') handleClose();
     }
-  };
-
-  const handleClose = () => {
-    setSelectedPhotoIndex(null);
-    setSelectedAlbum(null);
-    setIsZoomed(false);
-  };
+  }, [isFullscreenMode, handlePrevPhoto, handleNextPhoto, handleClose]);
 
   // Touch event handlers for swipe navigation
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -76,7 +76,7 @@ const Galeri = () => {
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedPhotoIndex, currentAlbum]);
+  }, [handleKeyDown]);
 
   if (error) {
     return (
@@ -148,6 +148,7 @@ const Galeri = () => {
                         src={photo.image_url}
                         alt={photo.caption || album.title}
                         className="absolute inset-0 w-full h-full object-cover"
+                        loading="lazy"
                       />
                     </div>
                     {photo.caption && (
@@ -226,6 +227,7 @@ const Galeri = () => {
                     "max-w-full max-h-full object-contain transition-transform duration-200",
                     isZoomed && "scale-150"
                   )}
+                  fetchPriority="high"
                 />
               </div>
 

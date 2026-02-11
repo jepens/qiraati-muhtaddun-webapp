@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, MapPin, Filter, Search } from 'lucide-react';
+import { Calendar, Clock, MapPin, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useActivities } from '@/hooks/useActivities';
+import { useActivities } from '@/hooks/use-activities';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const categoryColors = {
@@ -28,7 +28,7 @@ const Kegiatan: React.FC = () => {
   const filteredActivities = activities
     .filter(activity => {
       const matchesSearch = activity.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           activity.description.toLowerCase().includes(searchQuery.toLowerCase());
+        activity.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || activity.category === selectedCategory;
       return matchesSearch && matchesCategory;
     })

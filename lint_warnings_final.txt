@@ -1,0 +1,67 @@
+
+> vite_react_shadcn_ts@0.0.0 lint
+> eslint .
+
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\badge.tsx
+  36:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\button.tsx
+  56:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\calendar.tsx
+  55:25  warning  '_props' is defined but never used  @typescript-eslint/no-unused-vars
+  56:26  warning  '_props' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\command.tsx
+  24:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-empty-object-type')
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\form.tsx
+  168:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\navigation-menu.tsx
+  119:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\sidebar.tsx
+  760:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\sonner.tsx
+  30:19  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\textarea.tsx
+  5:1  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-empty-object-type')
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\toggle.tsx
+  43:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\hooks\useActivities.tsx
+  160:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\hooks\useAuth.tsx
+  79:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\hooks\useGallery.tsx
+  273:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\hooks\useStorage.ts
+  19:35  warning  'data' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\pages\AdminDashboard.tsx
+  17:3  warning  'Clock' is defined but never used   @typescript-eslint/no-unused-vars
+  24:3  warning  'MapPin' is defined but never used  @typescript-eslint/no-unused-vars
+  26:3  warning  'Eye' is defined but never used     @typescript-eslint/no-unused-vars
+  27:3  warning  'Image' is defined but never used   @typescript-eslint/no-unused-vars
+  28:3  warning  'Info' is defined but never used    @typescript-eslint/no-unused-vars
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\pages\JadwalSholat.tsx
+  199:11  warning  'currentTimeStr' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\pages\Qiraati.tsx
+  143:6  warning  React Hook React.useEffect has missing dependencies: 'handleVoiceSearch' and 'transcript'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\providers\AuthProvider.tsx
+  18:14  warning  Fast refresh only works when a file only exports components. Move your React context(s) to a separate file  react-refresh/only-export-components
+
+✖ 23 problems (0 errors, 23 warnings)
+  0 errors and 2 warnings potentially fixable with the `--fix` option.
+

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSurahDetail } from '@/hooks/useQuran';
-import { Slider } from '@/components/ui/slider';
+
 
 const scrollSpeeds = {
   slow: 80,
@@ -24,7 +24,7 @@ const SurahDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { surah: surahData, loading } = useSurahDetail(id);
-  
+
   const [isPlayingFull, setIsPlayingFull] = useState(false);
   const [playingAyat, setPlayingAyat] = useState<number | null>(null);
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
@@ -33,7 +33,7 @@ const SurahDetail: React.FC = () => {
   const [scrollSpeed, setScrollSpeed] = useState<'slow' | 'medium' | 'fast'>('medium');
   const [scrollProgress, setScrollProgress] = useState(0);
   const ayatListRef = useRef<HTMLDivElement>(null);
-  
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const ayatAudioRefs = useRef<Record<number, HTMLAudioElement>>({});
 
@@ -71,7 +71,7 @@ const SurahDetail: React.FC = () => {
     if (!autoScroll) return;
     const container = ayatListRef.current;
     if (!container) return;
-    
+
     let animationFrame: number;
     const scrollStep = () => {
       if (!autoScroll) return;
@@ -82,7 +82,7 @@ const SurahDetail: React.FC = () => {
       container.scrollTop += 1;
       animationFrame = window.setTimeout(scrollStep, scrollSpeeds[scrollSpeed]);
     };
-    
+
     animationFrame = window.setTimeout(scrollStep, scrollSpeeds[scrollSpeed]);
     return () => {
       clearTimeout(animationFrame);
@@ -91,7 +91,7 @@ const SurahDetail: React.FC = () => {
 
   const playFullSurah = () => {
     if (!surahData?.audioFull?.['01']) return;
-    
+
     if (audioRef.current) {
       if (isPlayingFull) {
         audioRef.current.pause();
@@ -102,7 +102,7 @@ const SurahDetail: React.FC = () => {
           console.error('Error playing full surah:', error);
         });
         setIsPlayingFull(true);
-        
+
         // Stop any playing ayat
         setPlayingAyat(null);
         Object.values(ayatAudioRefs.current).forEach(audio => {
@@ -114,7 +114,7 @@ const SurahDetail: React.FC = () => {
 
   const playAyat = (ayatNumber: number) => {
     if (!surahData) return;
-    
+
     const ayat = surahData.ayat.find(a => a.nomorAyat === ayatNumber);
     if (!ayat?.audio?.['01']) return;
 
@@ -136,7 +136,7 @@ const SurahDetail: React.FC = () => {
     }
 
     const ayatAudio = ayatAudioRefs.current[ayatNumber];
-    
+
     if (playingAyat === ayatNumber) {
       ayatAudio.pause();
       setPlayingAyat(null);
@@ -146,7 +146,7 @@ const SurahDetail: React.FC = () => {
         console.error('Error playing ayat:', error);
       });
       setPlayingAyat(ayatNumber);
-      
+
       ayatAudio.onended = () => {
         setPlayingAyat(null);
       };
@@ -293,12 +293,11 @@ const SurahDetail: React.FC = () => {
                       <Minus className="w-4 h-4" />
                     </Button>
                     <div className="flex-1 h-4 bg-secondary rounded-full overflow-hidden">
-                      {['sm', 'md', 'lg', 'xl'].map((size, index) => (
+                      {['sm', 'md', 'lg', 'xl'].map((size) => (
                         <div
                           key={size}
-                          className={`h-full w-1/4 ${
-                            fontSize === size ? 'bg-primary' : ''
-                          }`}
+                          className={`h-full w-1/4 ${fontSize === size ? 'bg-primary' : ''
+                            }`}
                         />
                       ))}
                     </div>
@@ -364,8 +363,8 @@ const SurahDetail: React.FC = () => {
           </Card>
 
           {/* Ayat List with improved styling */}
-          <div 
-            ref={ayatListRef} 
+          <div
+            ref={ayatListRef}
             className="space-y-6 max-h-[calc(100vh-24rem)] overflow-y-auto scroll-smooth"
             style={{
               scrollBehavior: 'smooth'
@@ -396,9 +395,9 @@ const SurahDetail: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p 
+                  <p
                     className="font-arabic text-right leading-[2]"
-                    style={{ 
+                    style={{
                       fontSize: fontSizes[fontSize],
                       transition: 'font-size 0.3s ease'
                     }}

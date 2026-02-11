@@ -4,46 +4,38 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 
 const AdminLogin: React.FC = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { signIn } = useAuth();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!username || !password) {
+
+    if (!email || !password) {
       toast({
         title: "Error",
-        description: "Username dan password harus diisi",
+        description: "Email dan password harus diisi",
         variant: "destructive",
       });
       return;
     }
 
     setLoading(true);
-    
+
     try {
-      const success = await login(username, password);
-      
-      if (success) {
-        toast({
-          title: "Login Berhasil",
-          description: "Selamat datang, Admin!",
-        });
-      } else {
-        toast({
-          title: "Login Gagal",
-          description: "Username atau password salah",
-          variant: "destructive",
-        });
-      }
+      await signIn(email, password);
+
+      toast({
+        title: "Login Berhasil",
+        description: "Selamat datang, Admin!",
+      });
     } catch (error) {
       console.error('Login error:', error);
       toast({
@@ -72,22 +64,22 @@ const AdminLogin: React.FC = () => {
             Masuk ke panel admin Masjid Al-Muhtaddun
           </p>
         </CardHeader>
-        
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Username Field */}
+            {/* Email Field */}
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-sm font-medium">
-                Username
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="username"
-                  type="text"
-                  placeholder="Masukkan username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="email"
+                  type="email"
+                  placeholder="Masukkan email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
                   disabled={loading}
                 />
@@ -115,6 +107,7 @@ const AdminLogin: React.FC = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground"
                   disabled={loading}
+                  aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>

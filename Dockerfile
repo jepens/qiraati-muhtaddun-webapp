@@ -13,9 +13,12 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Set environment variables untuk build
-ENV VITE_SUPABASE_URL=https://vqrtwwberevzvxmcycij.supabase.co
-ENV VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxcnR3d2JlcmV2enZ4bWN5Y2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxNDY0ODgsImV4cCI6MjA2NzcyMjQ4OH0.WD9swBhT3wMbEEPruCmouatFxCVlJ6HzVfGIx29E7Uc
+# Set environment variables untuk build (bisa di-override via build args)
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 
 # Build aplikasi untuk production
 RUN npm run build

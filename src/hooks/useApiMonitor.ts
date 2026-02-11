@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { API_BASE_URL } from '@/lib/config';
 
@@ -43,10 +43,10 @@ export const useApiMonitor = () => {
     },
   ]);
 
-  const checkSupabaseStatus = async (): Promise<Partial<ApiStatus>> => {
+  const checkSupabaseStatus = useCallback(async (): Promise<Partial<ApiStatus>> => {
     try {
       const startTime = Date.now();
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('homepage_content')
         .select('id')
         .limit(1);
@@ -67,17 +67,17 @@ export const useApiMonitor = () => {
         responseTime,
         lastChecked: new Date(),
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         status: 'offline',
         responseTime: null,
         lastChecked: new Date(),
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorMessage: _error instanceof Error ? _error.message : 'Unknown error',
       };
     }
-  };
+  }, []);
 
-  const checkApiEndpoint = async (url: string): Promise<Partial<ApiStatus>> => {
+  const checkApiEndpoint = useCallback(async (url: string): Promise<Partial<ApiStatus>> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -114,9 +114,9 @@ export const useApiMonitor = () => {
         errorMessage: error instanceof Error ? error.message : 'Connection failed',
       };
     }
-  };
+  }, []);
 
-  const checkBackendApiStatus = async (): Promise<Partial<ApiStatus>> => {
+  const checkBackendApiStatus = useCallback(async (): Promise<Partial<ApiStatus>> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -154,9 +154,9 @@ export const useApiMonitor = () => {
         errorMessage: error instanceof Error ? error.message : 'Backend server not running',
       };
     }
-  };
+  }, []);
 
-  const checkPrayerTimesApi = async (): Promise<Partial<ApiStatus>> => {
+  const checkPrayerTimesApi = useCallback(async (): Promise<Partial<ApiStatus>> => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -166,7 +166,7 @@ export const useApiMonitor = () => {
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const date = String(now.getDate()).padStart(2, '0');
-      
+
       const response = await fetch(
         `${API_BASE_URL}/prayer-times/${year}/${month}/${date}`,
         {
@@ -201,18 +201,18 @@ export const useApiMonitor = () => {
           errorMessage: `HTTP ${response.status}: ${response.statusText}`,
         };
       }
-    } catch (error) {
+    } catch (_error) {
       clearTimeout(timeoutId);
       return {
         status: 'offline',
         responseTime: null,
         lastChecked: new Date(),
-        errorMessage: error instanceof Error ? error.message : 'Connection failed',
+        errorMessage: _error instanceof Error ? _error.message : 'Connection failed',
       };
     }
-  };
+  }, []);
 
-  const checkAllApis = async () => {
+  const checkAllApis = useCallback(async () => {
     const checks = [
       { index: 0, checker: checkSupabaseStatus },
       { index: 1, checker: checkBackendApiStatus },
@@ -225,7 +225,7 @@ export const useApiMonitor = () => {
       checks.map(({ checker }) => checker())
     );
 
-    setApiStatuses(prev => 
+    setApiStatuses(prev =>
       prev.map((api, index) => {
         const result = results[index];
         if (result.status === 'fulfilled') {
@@ -241,7 +241,7 @@ export const useApiMonitor = () => {
         }
       })
     );
-  };
+  }, [checkSupabaseStatus, checkBackendApiStatus, checkApiEndpoint, checkPrayerTimesApi]);
 
   useEffect(() => {
     // Initial check
@@ -251,12 +251,12 @@ export const useApiMonitor = () => {
     const interval = setInterval(checkAllApis, 300000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [checkAllApis]);
 
   const getOverallStatus = () => {
     const onlineCount = apiStatuses.filter(api => api.status === 'online').length;
     const totalCount = apiStatuses.length;
-    
+
     if (onlineCount === totalCount) return 'healthy';
     if (onlineCount === 0) return 'critical';
     return 'warning';
@@ -266,9 +266,9 @@ export const useApiMonitor = () => {
     const responseTimes = apiStatuses
       .filter(api => api.responseTime !== null)
       .map(api => api.responseTime!);
-    
+
     if (responseTimes.length === 0) return null;
-    
+
     return Math.round(responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length);
   };
 

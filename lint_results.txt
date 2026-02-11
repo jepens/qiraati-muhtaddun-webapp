@@ -1,0 +1,31 @@
+
+> vite_react_shadcn_ts@0.0.0 lint
+> eslint .
+
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\badge.tsx
+  18:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\form.tsx
+  10:3  warning  'useFormContext' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\sonner.tsx
+  30:19  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\components\ui\toggle.tsx
+  43:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\hooks\useActivities.tsx
+  160:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\hooks\useAuth.tsx
+  79:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\hooks\useGallery.tsx
+  273:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\bedul\apk\website masjid\qiraati-muhtaddun-webapp\src\providers\AuthProvider.tsx
+  18:14  warning  Fast refresh only works when a file only exports components. Move your React context(s) to a separate file  react-refresh/only-export-components
+
+✖ 8 problems (0 errors, 8 warnings)
+

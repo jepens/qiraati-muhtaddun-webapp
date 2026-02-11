@@ -16,7 +16,7 @@ export const useStorage = () => {
       const filePath = `photos/${fileName}`;
 
       // Upload file to Supabase Storage
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('photos')
         .upload(filePath, file);
 

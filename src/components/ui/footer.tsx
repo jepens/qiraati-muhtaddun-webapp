@@ -11,7 +11,7 @@ export const Footer = () => {
           </p>
           <div className="text-sm text-primary-foreground/60">
             <p>© 2025 Masjid Al-Muhtaddun. Semua hak dilindungi.</p>
-            <p className="mt-2 arabic-text">
+            <p className="mt-2 arabic-text" lang="ar" dir="rtl">
               وَأَنَّ الْمَسَاجِدَ لِلَّهِ فَلَا تَدْعُوا مَعَ اللَّهِ أَحَدًا
             </p>
           </div>

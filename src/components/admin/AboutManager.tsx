@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,11 +17,7 @@ const AboutManager: React.FC = () => {
   const [content, setContent] = useState<AboutContent | null>(null);
   const [missionItems, setMissionItems] = useState<string[]>([]);
 
-  useEffect(() => {
-    fetchContent();
-  }, []);
-
-  const fetchContent = async () => {
+  const fetchContent = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('about_content')
@@ -44,7 +40,11 @@ const AboutManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchContent();
+  }, [fetchContent]);
 
   const handleMissionItemChange = (index: number, value: string) => {
     const newItems = [...missionItems];
@@ -218,7 +218,7 @@ const AboutManager: React.FC = () => {
                 onChange={(e) => {
                   const value = e.target.value;
                   let embedUrl = value;
-                  
+
                   // Jika input adalah iframe HTML, ekstrak URL-nya
                   if (value.includes('<iframe')) {
                     const urlMatch = value.match(/src="([^"]+)"/);
@@ -226,7 +226,7 @@ const AboutManager: React.FC = () => {
                       embedUrl = urlMatch[1];
                     }
                   }
-                  
+
                   setContent(prev => ({ ...prev!, google_maps_embed: embedUrl }));
                 }}
                 rows={3}

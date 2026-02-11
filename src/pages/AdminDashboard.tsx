@@ -11,21 +11,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  BarChart3, 
-  Users, 
-  Clock, 
-  CheckCircle, 
-  AlertCircle, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Calendar, 
-  MapPin, 
+import {
+  BarChart3,
+  Users,
+  CheckCircle,
+  AlertCircle,
+  Plus,
+  Edit,
+  Trash2,
+  Calendar,
   Search,
-  Eye,
-  Image,
-  Info
 } from 'lucide-react';
 import { useActivities } from '@/hooks/useActivities';
 import type { Activity } from '@/types/database.types';
@@ -146,7 +141,7 @@ const AdminDashboard = () => {
   // Filter activities
   const filteredActivities = activities.filter(activity => {
     const matchesSearch = activity.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         activity.description.toLowerCase().includes(searchQuery.toLowerCase());
+      activity.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || activity.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -271,7 +266,7 @@ const AdminDashboard = () => {
                 <p className="text-xs text-muted-foreground">+20.1% dari bulan lalu</p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Bacaan Quran</CardTitle>
@@ -282,7 +277,7 @@ const AdminDashboard = () => {
                 <p className="text-xs text-muted-foreground">+12.5% dari bulan lalu</p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Kegiatan Aktif</CardTitle>
@@ -295,7 +290,7 @@ const AdminDashboard = () => {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Peserta Kegiatan</CardTitle>
@@ -326,7 +321,7 @@ const AdminDashboard = () => {
                       <p className="text-sm text-muted-foreground">2 menit yang lalu</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center">
                     <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
                       <CheckCircle className="w-4 h-4 text-green-600" />
@@ -338,7 +333,7 @@ const AdminDashboard = () => {
                       <p className="text-sm text-muted-foreground">1 jam yang lalu</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center">
                     <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center">
                       <Calendar className="w-4 h-4 text-purple-600" />
@@ -350,7 +345,7 @@ const AdminDashboard = () => {
                       <p className="text-sm text-muted-foreground">3 jam yang lalu</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center">
                     <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center">
                       <AlertCircle className="w-4 h-4 text-orange-600" />
@@ -415,7 +410,7 @@ const AdminDashboard = () => {
                       <p className="text-xs text-muted-foreground">Surah tersedia</p>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Pencarian Suara</CardTitle>
@@ -425,7 +420,7 @@ const AdminDashboard = () => {
                       <p className="text-xs text-muted-foreground">Pencarian bulan ini</p>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Surah Populer</CardTitle>
@@ -436,7 +431,7 @@ const AdminDashboard = () => {
                     </CardContent>
                   </Card>
                 </div>
-                
+
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
@@ -470,7 +465,7 @@ const AdminDashboard = () => {
                       </p>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Akses Harian</CardTitle>
@@ -481,7 +476,7 @@ const AdminDashboard = () => {
                     </CardContent>
                   </Card>
                 </div>
-                
+
                 <Alert>
                   <CheckCircle className="h-4 w-4" />
                   <AlertDescription>
@@ -516,14 +511,14 @@ const AdminDashboard = () => {
                           <Input
                             id="title"
                             value={formData.title}
-                            onChange={(e) => setFormData({...formData, title: e.target.value})}
+                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                             placeholder="Masukkan judul kegiatan"
                           />
                         </div>
-                        
+
                         <div className="space-y-2">
                           <Label htmlFor="category">Kategori *</Label>
-                          <Select value={formData.category} onValueChange={(value: Activity['category']) => setFormData({...formData, category: value})}>
+                          <Select value={formData.category} onValueChange={(value: Activity['category']) => setFormData({ ...formData, category: value })}>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
@@ -537,18 +532,18 @@ const AdminDashboard = () => {
                           </Select>
                         </div>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label htmlFor="description">Deskripsi *</Label>
                         <Textarea
                           id="description"
                           value={formData.description}
-                          onChange={(e) => setFormData({...formData, description: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                           placeholder="Masukkan deskripsi kegiatan"
                           rows={3}
                         />
                       </div>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="date">Tanggal *</Label>
@@ -556,40 +551,40 @@ const AdminDashboard = () => {
                             id="date"
                             type="date"
                             value={formData.date}
-                            onChange={(e) => setFormData({...formData, date: e.target.value})}
+                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                           />
                         </div>
-                        
+
                         <div className="space-y-2">
                           <Label htmlFor="time">Waktu *</Label>
                           <Input
                             id="time"
                             type="time"
                             value={formData.time}
-                            onChange={(e) => setFormData({...formData, time: e.target.value})}
+                            onChange={(e) => setFormData({ ...formData, time: e.target.value })}
                           />
                         </div>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label htmlFor="location">Lokasi *</Label>
                         <Input
                           id="location"
                           value={formData.location}
-                          onChange={(e) => setFormData({...formData, location: e.target.value})}
+                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                           placeholder="Masukkan lokasi kegiatan"
                         />
                       </div>
-                      
+
                       <div className="flex items-center space-x-2">
                         <Switch
                           id="isActive"
                           checked={formData.is_active}
-                          onCheckedChange={(checked) => setFormData({...formData, is_active: checked})}
+                          onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                         />
                         <Label htmlFor="isActive">Kegiatan Aktif</Label>
                       </div>
-                      
+
                       <div className="flex justify-end space-x-2">
                         <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                           Batal
@@ -615,7 +610,7 @@ const AdminDashboard = () => {
                       <div className="text-2xl font-bold">{stats.totalActivities}</div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Kegiatan Aktif</CardTitle>
@@ -624,7 +619,7 @@ const AdminDashboard = () => {
                       <div className="text-2xl font-bold text-green-600">{stats.activeActivities}</div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Mendatang</CardTitle>
@@ -633,7 +628,7 @@ const AdminDashboard = () => {
                       <div className="text-2xl font-bold text-blue-600">{stats.upcomingActivities}</div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Total Peserta</CardTitle>
@@ -643,7 +638,7 @@ const AdminDashboard = () => {
                     </CardContent>
                   </Card>
                 </div>
-                
+
                 {/* Filters */}
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1">
@@ -657,7 +652,7 @@ const AdminDashboard = () => {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="w-full md:w-48">
                     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                       <SelectTrigger>
@@ -674,7 +669,7 @@ const AdminDashboard = () => {
                     </Select>
                   </div>
                 </div>
-                
+
                 {/* Activities Table */}
                 <div className="rounded-md border">
                   <Table>
@@ -749,7 +744,7 @@ const AdminDashboard = () => {
                     </TableBody>
                   </Table>
                 </div>
-                
+
                 {filteredActivities.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     Tidak ada kegiatan yang ditemukan
@@ -806,7 +801,7 @@ const AdminDashboard = () => {
                       </div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Status Server</CardTitle>
@@ -829,7 +824,7 @@ const AdminDashboard = () => {
                     </CardContent>
                   </Card>
                 </div>
-                
+
                 <Alert>
                   <CheckCircle className="h-4 w-4" />
                   <AlertDescription>
@@ -855,14 +850,14 @@ const AdminDashboard = () => {
                 <Input
                   id="edit-title"
                   value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="Masukkan judul kegiatan"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="edit-category">Kategori *</Label>
-                <Select value={formData.category} onValueChange={(value: Activity['category']) => setFormData({...formData, category: value})}>
+                <Select value={formData.category} onValueChange={(value: Activity['category']) => setFormData({ ...formData, category: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -876,18 +871,18 @@ const AdminDashboard = () => {
                 </Select>
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="edit-description">Deskripsi *</Label>
               <Textarea
                 id="edit-description"
                 value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Masukkan deskripsi kegiatan"
                 rows={3}
               />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-date">Tanggal *</Label>
@@ -895,40 +890,40 @@ const AdminDashboard = () => {
                   id="edit-date"
                   type="date"
                   value={formData.date}
-                  onChange={(e) => setFormData({...formData, date: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="edit-time">Waktu *</Label>
                 <Input
                   id="edit-time"
                   type="time"
                   value={formData.time}
-                  onChange={(e) => setFormData({...formData, time: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="edit-location">Lokasi *</Label>
               <Input
                 id="edit-location"
                 value={formData.location}
-                onChange={(e) => setFormData({...formData, location: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 placeholder="Masukkan lokasi kegiatan"
               />
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <Switch
                 id="edit-isActive"
                 checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData({...formData, is_active: checked})}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
               />
               <Label htmlFor="edit-isActive">Kegiatan Aktif</Label>
             </div>
-            
+
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setEditingActivity(null)}>
                 Batal
@@ -949,7 +944,7 @@ const AdminDashboard = () => {
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground">
-              Apakah Anda yakin ingin menghapus kegiatan "{activityToDelete?.title}"? 
+              Apakah Anda yakin ingin menghapus kegiatan "{activityToDelete?.title}"?
               Tindakan ini tidak dapat dibatalkan.
             </p>
           </div>

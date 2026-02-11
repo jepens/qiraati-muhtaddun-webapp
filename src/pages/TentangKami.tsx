@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapPin, Phone, Mail, Clock, Heart, Users, Book } from 'lucide-react';
+import { MapPin, Phone, Mail, Clock, Heart, Book } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
 import type { AboutContent, Facility } from '@/types/database.types';
@@ -70,7 +70,7 @@ const TentangKami: React.FC = () => {
           وَأَنَّ الْمَسَاجِدَ لِلَّهِ فَلَا تَدْعُوا مَعَ اللَّهِ أَحَدًا
         </div>
         <p className="text-elderly italic text-muted-foreground max-w-3xl mx-auto">
-          "Dan sesungguhnya masjid-masjid itu adalah kepunyaan Allah. 
+          "Dan sesungguhnya masjid-masjid itu adalah kepunyaan Allah.
           Maka janganlah kamu menyembah seseorangpun di dalamnya di samping (menyembah) Allah."
           (QS. Al-Jin: 18)
         </p>
@@ -137,10 +137,10 @@ const TentangKami: React.FC = () => {
             <Card key={facility.id} className="text-center p-6">
               <IconComponent name={facility.icon_name} />
               <h3 className="text-elderly-lg font-semibold mb-2">{facility.name}</h3>
-            <p className="text-elderly text-muted-foreground">
+              <p className="text-elderly text-muted-foreground">
                 {facility.description}
-            </p>
-          </Card>
+              </p>
+            </Card>
           ))}
         </div>
       </section>

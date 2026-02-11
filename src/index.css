@@ -28,7 +28,7 @@
     --secondary-foreground: 28 25% 15%;
 
     --muted: 45 25% 92%;               /* Soft warm gray */
-    --muted-foreground: 28 15% 45%;
+    --muted-foreground: 28 15% 35%;    /* Darker for 4.5:1 contrast */
 
     --accent: 38 65% 85%;              /* Soft gold accent */
     --accent-foreground: 28 25% 15%;

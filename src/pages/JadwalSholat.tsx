@@ -24,16 +24,16 @@ interface PrayerScheduleResponse {
     id: string;
     lokasi: string;
     daerah: string;
-  jadwal: {
-    tanggal: string;
-    imsak: string;
-    subuh: string;
-    terbit: string;
-    dhuha: string;
-    dzuhur: string;
-    ashar: string;
-    maghrib: string;
-    isya: string;
+    jadwal: {
+      tanggal: string;
+      imsak: string;
+      subuh: string;
+      terbit: string;
+      dhuha: string;
+      dzuhur: string;
+      ashar: string;
+      maghrib: string;
+      isya: string;
       date: string;
     };
   };
@@ -73,18 +73,18 @@ const JadwalSholat: React.FC = () => {
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const date = String(now.getDate()).padStart(2, '0');
-        
+
         const response = await fetch(`${API_BASE_URL}/prayer-times/${year}/${month}/${date}`);
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch prayer times');
         }
-        
+
         const result: PrayerScheduleResponse = await response.json();
-        
+
         if (result.status && result.data) {
           const { jadwal, lokasi, daerah } = result.data;
-          
+
           // Set prayer times from API response
           setPrayerTimes({
             imsak: jadwal.imsak,
@@ -96,11 +96,11 @@ const JadwalSholat: React.FC = () => {
             maghrib: jadwal.maghrib,
             isya: jadwal.isya
           });
-          
+
           // Set location info
           setLocation(`${lokasi}, ${daerah}`);
           setPrayerDate(jadwal.tanggal);
-          
+
           // Calculate next prayer
           calculateNextPrayer({
             imsak: jadwal.imsak,
@@ -112,11 +112,11 @@ const JadwalSholat: React.FC = () => {
             maghrib: jadwal.maghrib,
             isya: jadwal.isya
           });
-          
+
         } else {
           throw new Error('Invalid response format');
         }
-        
+
       } catch (error) {
         console.error('Error fetching prayer times:', error);
         toast({
@@ -124,7 +124,7 @@ const JadwalSholat: React.FC = () => {
           description: "Gagal memuat jadwal sholat. Menggunakan data fallback.",
           variant: "destructive",
         });
-        
+
         // Fallback to mock data if API fails
         const mockPrayerTimes: PrayerTime = {
           imsak: '04:30',
@@ -141,7 +141,7 @@ const JadwalSholat: React.FC = () => {
         setLocation('Jakarta, Indonesia');
         setPrayerDate('Data Fallback');
         calculateNextPrayer(mockPrayerTimes);
-        
+
       } finally {
         setLoading(false);
       }
@@ -153,7 +153,7 @@ const JadwalSholat: React.FC = () => {
   const calculateNextPrayer = (times: PrayerTime) => {
     const now = new Date();
     const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    
+
     const prayers = [
       { name: 'Subuh', time: times.subuh },
       { name: 'Dzuhur', time: times.dzuhur },
@@ -169,7 +169,7 @@ const JadwalSholat: React.FC = () => {
         return;
       }
     }
-    
+
     // If all prayers have passed, next prayer is tomorrow's Subuh
     setNextPrayer('Subuh (Besok)');
   };
@@ -196,12 +196,11 @@ const JadwalSholat: React.FC = () => {
 
   const isPrayerTime = (prayerTime: string) => {
     const now = new Date();
-    const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     // Allow 5 minutes window for prayer time notification
     const [hours, minutes] = prayerTime.split(':').map(Number);
     const prayerTimeMinutes = hours * 60 + minutes;
     const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-    
+
     return Math.abs(currentTimeMinutes - prayerTimeMinutes) <= 5;
   };
 
@@ -211,10 +210,10 @@ const JadwalSholat: React.FC = () => {
 
   const getTimeUntilNextPrayer = () => {
     if (!prayerTimes || !nextPrayer || nextPrayer === 'Subuh (Besok)') return '';
-    
+
     const now = new Date();
     const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-    
+
     const prayers = [
       { name: 'Subuh', time: prayerTimes.subuh },
       { name: 'Dzuhur', time: prayerTimes.dzuhur },
@@ -229,12 +228,12 @@ const JadwalSholat: React.FC = () => {
     const [hours, minutes] = nextPrayerTime.split(':').map(Number);
     const nextPrayerMinutes = hours * 60 + minutes;
     const diffMinutes = nextPrayerMinutes - currentTimeMinutes;
-    
+
     if (diffMinutes <= 0) return '';
-    
+
     const diffHours = Math.floor(diffMinutes / 60);
     const remainingMinutes = diffMinutes % 60;
-    
+
     if (diffHours > 0) {
       return `${diffHours} jam ${remainingMinutes} menit lagi`;
     } else {
@@ -305,7 +304,7 @@ const JadwalSholat: React.FC = () => {
             const displayName = prayerName.charAt(0).toUpperCase() + prayerName.slice(1);
             const isActive = isPrayerTime(time);
             const isNext = isNextPrayer(displayName);
-            
+
             return (
               <Card
                 key={prayerName}

@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
@@ -39,11 +39,9 @@ const FacilityManager: React.FC = () => {
     icon_name: 'users' as Facility['icon_name'],
   });
 
-  useEffect(() => {
-    fetchFacilities();
-  }, []);
 
-  const fetchFacilities = async () => {
+
+  const fetchFacilities = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('facilities')
@@ -63,7 +61,11 @@ const FacilityManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchFacilities();
+  }, [fetchFacilities]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -216,7 +218,7 @@ const FacilityManager: React.FC = () => {
                 <Label htmlFor="icon">Icon</Label>
                 <Select
                   value={formData.icon_name}
-                  onValueChange={(value: Facility['icon_name']) => 
+                  onValueChange={(value: Facility['icon_name']) =>
                     setFormData(prev => ({ ...prev, icon_name: value }))
                   }
                 >

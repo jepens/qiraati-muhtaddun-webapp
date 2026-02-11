@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useActivities } from '@/hooks/useActivities';
+import { useActivities } from '@/hooks/use-activities';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ const ActivityManager = () => {
     location: '',
     category: 'kajian',
     is_active: true,
+    current_participants: 0,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,6 +49,7 @@ const ActivityManager = () => {
       setIsDialogOpen(false);
       resetForm();
     } catch (error) {
+      console.error('Error saving activity:', error);
       toast({
         variant: "destructive",
         title: "Error saving activity",
@@ -66,6 +68,7 @@ const ActivityManager = () => {
       location: activity.location,
       category: activity.category,
       is_active: activity.is_active,
+      current_participants: activity.current_participants || 0,
     });
     setIsDialogOpen(true);
   };
@@ -79,6 +82,7 @@ const ActivityManager = () => {
         description: "The activity has been deleted successfully.",
       });
     } catch (error) {
+      console.error('Error deleting activity:', error);
       toast({
         variant: "destructive",
         title: "Error deleting activity",
@@ -97,6 +101,7 @@ const ActivityManager = () => {
       location: '',
       category: 'kajian',
       is_active: true,
+      current_participants: 0,
     });
   };
 

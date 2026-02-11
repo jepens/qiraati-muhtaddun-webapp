@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { useSurahList } from '@/hooks/useQuran';
-import { Gamepad2, RotateCcw, Trophy, Target, Clock, Star } from 'lucide-react';
+import { Gamepad2, RotateCcw, Trophy, Target, Star } from 'lucide-react';
 
-interface Card {
+interface MemoryCard {
   id: number;
   type: 'name' | 'meaning' | 'number';
   value: string;
@@ -27,7 +27,7 @@ const GameHafalan: React.FC = () => {
   const [gameMode, setGameMode] = useState<'name-meaning' | 'name-number' | 'meaning-number'>('name-meaning');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'paused' | 'gameOver'>('menu');
-  const [cards, setCards] = useState<Card[]>([]);
+  const [cards, setCards] = useState<MemoryCard[]>([]);
   const [flippedCards, setFlippedCards] = useState<number[]>([]);
   const [matchedPairs, setMatchedPairs] = useState<number>(0);
   const [stats, setStats] = useState<GameStats>({
@@ -36,7 +36,7 @@ const GameHafalan: React.FC = () => {
     time: 0,
     streak: 0
   });
-  const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
+  const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const { surahs: allSurahs } = useSurahList();
   const { toast } = useToast();
@@ -47,13 +47,13 @@ const GameHafalan: React.FC = () => {
 
     const cardCount = difficulty === 'easy' ? 8 : difficulty === 'medium' ? 12 : 16;
     const pairsNeeded = cardCount / 2;
-    
+
     // Randomly select surahs from all 114 surahs
     const shuffledSurahs = [...allSurahs].sort(() => Math.random() - 0.5);
     const selectedSurahs = shuffledSurahs.slice(0, pairsNeeded);
-    
-    const newCards: Card[] = [];
-    
+
+    const newCards: MemoryCard[] = [];
+
     selectedSurahs.forEach((surah, index) => {
       // First card
       newCards.push({
@@ -108,7 +108,7 @@ const GameHafalan: React.FC = () => {
     setStats({ score: 0, moves: 0, time: 0, streak: 0 });
     setFlippedCards([]);
     setMatchedPairs(0);
-    
+
     // Start timer
     const interval = setInterval(() => {
       setStats(prev => ({ ...prev, time: prev.time + 1 }));
@@ -119,7 +119,7 @@ const GameHafalan: React.FC = () => {
   // Handle card click
   const handleCardClick = (cardId: number) => {
     if (gameState !== 'playing') return;
-    
+
     const card = cards.find(c => c.id === cardId);
     if (!card || card.isFlipped || card.isMatched) return;
 
@@ -130,7 +130,7 @@ const GameHafalan: React.FC = () => {
     setFlippedCards(newFlippedCards);
 
     // Flip the card
-    setCards(prev => prev.map(c => 
+    setCards(prev => prev.map(c =>
       c.id === cardId ? { ...c, isFlipped: true } : c
     ));
 
@@ -142,16 +142,16 @@ const GameHafalan: React.FC = () => {
 
       if (firstCard && secondCard && firstCard.surahId === secondCard.surahId) {
         // Match found!
-        setCards(prev => prev.map(c => 
-          c.id === firstId || c.id === secondId 
-            ? { ...c, isMatched: true } 
+        setCards(prev => prev.map(c =>
+          c.id === firstId || c.id === secondId
+            ? { ...c, isMatched: true }
             : c
         ));
-        
+
         // Update stats and matched pairs
         setMatchedPairs(prev => {
           const newMatchedPairs = prev + 1;
-          
+
           // Update stats with current streak
           setStats(prevStats => ({
             ...prevStats,
@@ -159,20 +159,20 @@ const GameHafalan: React.FC = () => {
             moves: prevStats.moves + 1,
             streak: prevStats.streak + 1
           }));
-          
+
           // Check if game is complete
           if (newMatchedPairs === cards.length / 2) {
             setTimeout(() => {
               endGame();
             }, 500);
           }
-          
+
           return newMatchedPairs;
         });
-        
+
         // Reset flipped cards for next turn
         setFlippedCards([]);
-        
+
         toast({
           title: "Match! 🎉",
           description: `Surah ${firstCard.value} ditemukan!`,
@@ -180,9 +180,9 @@ const GameHafalan: React.FC = () => {
       } else {
         // No match
         setTimeout(() => {
-          setCards(prev => prev.map(c => 
-            c.id === firstId || c.id === secondId 
-              ? { ...c, isFlipped: false } 
+          setCards(prev => prev.map(c =>
+            c.id === firstId || c.id === secondId
+              ? { ...c, isFlipped: false }
               : c
           ));
           setFlippedCards([]);
@@ -205,7 +205,7 @@ const GameHafalan: React.FC = () => {
       setTimer(null);
     }
     setGameState('gameOver');
-    
+
     toast({
       title: "Selamat! 🏆",
       description: `Game selesai! Skor: ${stats.score}`,
@@ -234,15 +234,8 @@ const GameHafalan: React.FC = () => {
     };
   }, [timer]);
 
-  // Debug effect to monitor state changes
-  useEffect(() => {
-    console.log('Game State:', {
-      flippedCards,
-      matchedPairs,
-      stats,
-      gameState
-    });
-  }, [flippedCards, matchedPairs, stats, gameState]);
+
+
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -284,11 +277,10 @@ const GameHafalan: React.FC = () => {
                   <Button
                     variant={gameMode === 'name-meaning' ? 'default' : 'outline'}
                     onClick={() => setGameMode('name-meaning')}
-                    className={`h-28 flex flex-col gap-3 transition-all duration-300 ${
-                      gameMode === 'name-meaning' 
-                        ? 'shadow-lg scale-105' 
-                        : 'hover:scale-102 hover:shadow-md'
-                    }`}
+                    className={`h-28 flex flex-col gap-3 transition-all duration-300 ${gameMode === 'name-meaning'
+                      ? 'shadow-lg scale-105'
+                      : 'hover:scale-102 hover:shadow-md'
+                      }`}
                   >
                     <div className="text-2xl">📖</div>
                     <span className="font-bold text-lg">Nama ↔ Arti</span>
@@ -297,11 +289,10 @@ const GameHafalan: React.FC = () => {
                   <Button
                     variant={gameMode === 'name-number' ? 'default' : 'outline'}
                     onClick={() => setGameMode('name-number')}
-                    className={`h-28 flex flex-col gap-3 transition-all duration-300 ${
-                      gameMode === 'name-number' 
-                        ? 'shadow-lg scale-105' 
-                        : 'hover:scale-102 hover:shadow-md'
-                    }`}
+                    className={`h-28 flex flex-col gap-3 transition-all duration-300 ${gameMode === 'name-number'
+                      ? 'shadow-lg scale-105'
+                      : 'hover:scale-102 hover:shadow-md'
+                      }`}
                   >
                     <div className="text-2xl">🔢</div>
                     <span className="font-bold text-lg">Nama ↔ Nomor</span>
@@ -310,11 +301,10 @@ const GameHafalan: React.FC = () => {
                   <Button
                     variant={gameMode === 'meaning-number' ? 'default' : 'outline'}
                     onClick={() => setGameMode('meaning-number')}
-                    className={`h-28 flex flex-col gap-3 transition-all duration-300 ${
-                      gameMode === 'meaning-number' 
-                        ? 'shadow-lg scale-105' 
-                        : 'hover:scale-102 hover:shadow-md'
-                    }`}
+                    className={`h-28 flex flex-col gap-3 transition-all duration-300 ${gameMode === 'meaning-number'
+                      ? 'shadow-lg scale-105'
+                      : 'hover:scale-102 hover:shadow-md'
+                      }`}
                   >
                     <div className="text-2xl">🎯</div>
                     <span className="font-bold text-lg">Arti ↔ Nomor</span>
@@ -340,11 +330,10 @@ const GameHafalan: React.FC = () => {
                   <Button
                     variant={difficulty === 'easy' ? 'default' : 'outline'}
                     onClick={() => setDifficulty('easy')}
-                    className={`h-24 flex flex-col gap-2 transition-all duration-300 ${
-                      difficulty === 'easy' 
-                        ? 'shadow-lg scale-105' 
-                        : 'hover:scale-102 hover:shadow-md'
-                    }`}
+                    className={`h-24 flex flex-col gap-2 transition-all duration-300 ${difficulty === 'easy'
+                      ? 'shadow-lg scale-105'
+                      : 'hover:scale-102 hover:shadow-md'
+                      }`}
                   >
                     <div className="text-2xl">😊</div>
                     <span className="font-bold text-lg">Mudah</span>
@@ -353,11 +342,10 @@ const GameHafalan: React.FC = () => {
                   <Button
                     variant={difficulty === 'medium' ? 'default' : 'outline'}
                     onClick={() => setDifficulty('medium')}
-                    className={`h-24 flex flex-col gap-2 transition-all duration-300 ${
-                      difficulty === 'medium' 
-                        ? 'shadow-lg scale-105' 
-                        : 'hover:scale-102 hover:shadow-md'
-                    }`}
+                    className={`h-24 flex flex-col gap-2 transition-all duration-300 ${difficulty === 'medium'
+                      ? 'shadow-lg scale-105'
+                      : 'hover:scale-102 hover:shadow-md'
+                      }`}
                   >
                     <div className="text-2xl">🤔</div>
                     <span className="font-bold text-lg">Sedang</span>
@@ -366,11 +354,10 @@ const GameHafalan: React.FC = () => {
                   <Button
                     variant={difficulty === 'hard' ? 'default' : 'outline'}
                     onClick={() => setDifficulty('hard')}
-                    className={`h-24 flex flex-col gap-2 transition-all duration-300 ${
-                      difficulty === 'hard' 
-                        ? 'shadow-lg scale-105' 
-                        : 'hover:scale-102 hover:shadow-md'
-                    }`}
+                    className={`h-24 flex flex-col gap-2 transition-all duration-300 ${difficulty === 'hard'
+                      ? 'shadow-lg scale-105'
+                      : 'hover:scale-102 hover:shadow-md'
+                      }`}
                   >
                     <div className="text-2xl">😤</div>
                     <span className="font-bold text-lg">Sulit</span>
@@ -382,9 +369,9 @@ const GameHafalan: React.FC = () => {
 
             {/* Start Game Button */}
             <div className="text-center">
-              <Button 
-                onClick={startGame} 
-                size="lg" 
+              <Button
+                onClick={startGame}
+                size="lg"
                 className="h-20 px-12 text-xl font-bold bg-gradient-to-r from-primary to-green-600 hover:from-primary/90 hover:to-green-600/90 shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
               >
                 <Gamepad2 className="w-6 h-6 mr-3" />
@@ -411,8 +398,8 @@ const GameHafalan: React.FC = () => {
                 Game Hafalan
               </h1>
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={resetGame}
               className="shadow-md hover:shadow-lg transition-all duration-300"
             >
@@ -456,8 +443,8 @@ const GameHafalan: React.FC = () => {
               <span className="text-primary font-bold">{Math.round((matchedPairs / (cards.length / 2)) * 100)}%</span>
             </div>
             <div className="bg-white/50 rounded-full h-4 overflow-hidden shadow-inner">
-              <Progress 
-                value={(matchedPairs / (cards.length / 2)) * 100} 
+              <Progress
+                value={(matchedPairs / (cards.length / 2)) * 100}
                 className="h-4 bg-transparent"
               />
             </div>
@@ -469,9 +456,8 @@ const GameHafalan: React.FC = () => {
           {cards.map((card) => (
             <Card
               key={card.id}
-              className={`cursor-pointer transition-all duration-500 transform hover:scale-105 shadow-lg hover:shadow-xl ${
-                card.isFlipped || card.isMatched ? 'rotate-y-180' : ''
-              } ${card.isMatched ? 'bg-gradient-to-br from-green-100 to-green-200 border-green-300 shadow-green-200' : 'bg-white/90 backdrop-blur-sm'}`}
+              className={`cursor-pointer transition-all duration-500 transform hover:scale-105 shadow-lg hover:shadow-xl ${card.isFlipped || card.isMatched ? 'rotate-y-180' : ''
+                } ${card.isMatched ? 'bg-gradient-to-br from-green-100 to-green-200 border-green-300 shadow-green-200' : 'bg-white/90 backdrop-blur-sm'}`}
               onClick={() => handleCardClick(card.id)}
             >
               <CardContent className="p-6 h-32 flex items-center justify-center text-center">
@@ -529,16 +515,16 @@ const GameHafalan: React.FC = () => {
                 </div>
               </div>
               <div className="flex gap-3 pt-4">
-                <Button 
-                  onClick={startGame} 
+                <Button
+                  onClick={startGame}
                   className="flex-1 h-12 text-lg font-semibold bg-gradient-to-r from-primary to-green-600 hover:from-primary/90 hover:to-green-600/90 shadow-lg hover:shadow-xl transition-all duration-300"
                 >
                   <Gamepad2 className="w-5 h-5 mr-2" />
                   Main Lagi
                 </Button>
-                <Button 
-                  onClick={resetGame} 
-                  variant="outline" 
+                <Button
+                  onClick={resetGame}
+                  variant="outline"
                   className="flex-1 h-12 text-lg font-semibold shadow-md hover:shadow-lg transition-all duration-300"
                 >
                   <RotateCcw className="w-5 h-5 mr-2" />

@@ -31,7 +31,7 @@ const Homepage: React.FC = () => {
       {/* Hero Section */}
       <section className="text-center mb-16">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-4xl md:text-5xl font-bold text-primary mb-6">
+          <h1 className="text-4xl md:text-5xl font-bold text-primary mb-6" lang="ar" dir="rtl">
             {content.arabic_greeting}
           </h1>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
@@ -40,7 +40,7 @@ const Homepage: React.FC = () => {
           <p className="text-elderly-lg text-muted-foreground mb-8 leading-relaxed">
             {content.main_description}
           </p>
-          
+
           {/* Qiraati CTA Button */}
           <div className="mb-12">
             <Link
@@ -122,7 +122,7 @@ const Homepage: React.FC = () => {
             <p className="text-elderly-lg text-muted-foreground mb-6 leading-relaxed">
               {content.welcome_description}
             </p>
-            <div className="text-center arabic-text text-2xl text-primary font-semibold mb-4">
+            <div className="text-center arabic-text text-2xl text-primary font-semibold mb-4" lang="ar" dir="rtl">
               {content.quran_verse_arabic}
             </div>
             <p className="text-elderly italic text-muted-foreground">
@@ -140,11 +140,11 @@ const Homepage: React.FC = () => {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {content.announcements.map((announcement, index) => (
-              <Card 
+              <Card
                 key={index}
                 className={
-                  announcement.type === 'primary' 
-                    ? "bg-accent/20 border-accent" 
+                  announcement.type === 'primary'
+                    ? "bg-accent/20 border-accent"
                     : "bg-gold/20 border-gold"
                 }
               >

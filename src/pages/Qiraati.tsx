@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+
 import { useToast } from '@/hooks/use-toast';
 import { Search, Mic, MicOff, BookOpen } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,7 +16,7 @@ const Qiraati: React.FC = () => {
   const [transcript, setTranscript] = useState('');
   const [isDataReady, setIsDataReady] = useState(false);
   const [loading, setLoading] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -37,19 +37,32 @@ const Qiraati: React.FC = () => {
     setLoading(surahLoading);
   }, [surahLoading]);
 
+  // Refs for callbacks to access latest state without triggering re-renders
+  const transcriptRef = useRef(transcript);
+  const allSurahsRef = useRef(allSurahs);
+
+  // Update refs when state changes
+  React.useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+
+  React.useEffect(() => {
+    allSurahsRef.current = allSurahs;
+  }, [allSurahs]);
+
   // Initialize Speech Recognition
   React.useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
-      
+
       if (recognitionRef.current) {
         recognitionRef.current.continuous = false;
         recognitionRef.current.interimResults = true;
         recognitionRef.current.lang = 'id-ID'; // Indonesian language
         recognitionRef.current.maxAlternatives = 3; // Get multiple alternatives
-        
+
         recognitionRef.current.onstart = () => {
           setIsListening(true);
           toast({
@@ -57,12 +70,12 @@ const Qiraati: React.FC = () => {
             description: "Silakan ucapkan nama atau nomor surat yang ingin dibaca",
           });
         };
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+
         recognitionRef.current.onresult = (event: any) => {
           let finalTranscript = '';
           let interimTranscript = '';
-          
+
           // Process all results to get the best match
           for (let i = event.resultIndex; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
@@ -72,13 +85,13 @@ const Qiraati: React.FC = () => {
               interimTranscript += transcript;
             }
           }
-          
+
           // If we have a final result, use it
           if (finalTranscript) {
             setTranscript(finalTranscript);
             setSearchQuery(finalTranscript);
             // Check if surahs are loaded before searching
-            if (allSurahs.length > 0) {
+            if (allSurahsRef.current.length > 0) {
               handleVoiceSearch(finalTranscript);
             } else {
               toast({
@@ -93,12 +106,12 @@ const Qiraati: React.FC = () => {
             setSearchQuery(interimTranscript);
           }
         };
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+
         recognitionRef.current.onerror = (event: any) => {
           console.error('Speech recognition error:', event.error);
           setIsListening(false);
-          
+
           let errorMessage = "Maaf, suara tidak dikenali. ";
           switch (event.error) {
             case 'network':
@@ -114,18 +127,18 @@ const Qiraati: React.FC = () => {
             default:
               errorMessage += "Mohon coba lagi dengan lebih jelas atau gunakan pencarian teks.";
           }
-          
+
           toast({
             title: "Error",
             description: errorMessage,
             variant: "destructive",
           });
         };
-        
+
         recognitionRef.current.onend = () => {
           setIsListening(false);
           // If no final result was received, show a message
-          if (!transcript) {
+          if (!transcriptRef.current) {
             toast({
               title: "Info",
               description: "Pencarian suara selesai. Jika hasil tidak sesuai, coba ucapkan dengan lebih jelas.",
@@ -140,7 +153,8 @@ const Qiraati: React.FC = () => {
         variant: "destructive",
       });
     }
-  }, [toast, allSurahs]); // Added allSurahs dependency to reinitialize when data is loaded
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Initialize once
 
   const startVoiceRecognition = () => {
     if (recognitionRef.current && !isListening) {
@@ -191,7 +205,7 @@ const Qiraati: React.FC = () => {
       while (changed) {
         changed = false;
         for (const prefix of prefixes) {
-          const regex = new RegExp('^' + prefix + '[\s-]*', 'i');
+          const regex = new RegExp('^' + prefix + '[\\s-]*', 'i');
           if (regex.test(result)) {
             result = result.replace(regex, '');
             changed = true;
@@ -232,7 +246,7 @@ const Qiraati: React.FC = () => {
       let namaLatinCleaned = surah.namaLatin.toLowerCase();
       let namaCleaned = surah.nama.toLowerCase();
       let artiCleaned = surah.arti.toLowerCase();
-      
+
       // Hanya hapus prefix jika bukan nama surah yang valid
       if (!isValidSurahName(namaLatinCleaned)) {
         namaLatinCleaned = removePrefixes(surah.namaLatin);
@@ -243,7 +257,7 @@ const Qiraati: React.FC = () => {
       if (!isValidSurahName(artiCleaned)) {
         artiCleaned = removePrefixes(surah.arti);
       }
-      
+
       const namaLatinNorm = normalizeString(namaLatinCleaned);
       const namaNorm = normalizeString(namaCleaned);
       const artiNorm = normalizeString(artiCleaned);
@@ -262,7 +276,7 @@ const Qiraati: React.FC = () => {
         let namaLatinCleaned = surah.namaLatin.toLowerCase();
         let namaCleaned = surah.nama.toLowerCase();
         let artiCleaned = surah.arti.toLowerCase();
-        
+
         // Hanya hapus prefix jika bukan nama surah yang valid
         if (!isValidSurahName(namaLatinCleaned)) {
           namaLatinCleaned = removePrefixes(surah.namaLatin);
@@ -273,7 +287,7 @@ const Qiraati: React.FC = () => {
         if (!isValidSurahName(artiCleaned)) {
           artiCleaned = removePrefixes(surah.arti);
         }
-        
+
         const namaLatinNorm = normalizeString(namaLatinCleaned);
         const namaNorm = normalizeString(namaCleaned);
         const artiNorm = normalizeString(artiCleaned);
@@ -318,8 +332,8 @@ const Qiraati: React.FC = () => {
         .sort((a, b) => b.score - a.score)
         .slice(0, 3)
         .map(item => item.surah.namaLatin);
-      const suggestionText = suggestions.length > 0 
-        ? `Coba: ${suggestions.join(', ')}` 
+      const suggestionText = suggestions.length > 0
+        ? `Coba: ${suggestions.join(', ')}`
         : 'Coba kata kunci lain seperti: Al-Fatihah, Yasin, Al-Baqarah, Al-Kafirun';
       toast({
         variant: "destructive",
@@ -347,7 +361,7 @@ const Qiraati: React.FC = () => {
       while (changed) {
         changed = false;
         for (const prefix of prefixes) {
-          const regex = new RegExp('^' + prefix + '[\s-]*', 'i');
+          const regex = new RegExp('^' + prefix + '[\\s-]*', 'i');
           if (regex.test(result)) {
             result = result.replace(regex, '');
             changed = true;
@@ -388,7 +402,7 @@ const Qiraati: React.FC = () => {
       let namaLatinCleaned = surah.namaLatin.toLowerCase();
       let namaCleaned = surah.nama.toLowerCase();
       let artiCleaned = surah.arti.toLowerCase();
-      
+
       // Hanya hapus prefix jika bukan nama surah yang valid
       if (!isValidSurahName(namaLatinCleaned)) {
         namaLatinCleaned = removePrefixes(surah.namaLatin);
@@ -399,7 +413,7 @@ const Qiraati: React.FC = () => {
       if (!isValidSurahName(artiCleaned)) {
         artiCleaned = removePrefixes(surah.arti);
       }
-      
+
       const namaLatinNorm = normalizeString(namaLatinCleaned);
       const namaNorm = normalizeString(namaCleaned);
       const artiNorm = normalizeString(artiCleaned);
@@ -418,7 +432,7 @@ const Qiraati: React.FC = () => {
         let namaLatinCleaned = surah.namaLatin.toLowerCase();
         let namaCleaned = surah.nama.toLowerCase();
         let artiCleaned = surah.arti.toLowerCase();
-        
+
         // Hanya hapus prefix jika bukan nama surah yang valid
         if (!isValidSurahName(namaLatinCleaned)) {
           namaLatinCleaned = removePrefixes(surah.namaLatin);
@@ -429,7 +443,7 @@ const Qiraati: React.FC = () => {
         if (!isValidSurahName(artiCleaned)) {
           artiCleaned = removePrefixes(surah.arti);
         }
-        
+
         const namaLatinNorm = normalizeString(namaLatinCleaned);
         const namaNorm = normalizeString(namaCleaned);
         const artiNorm = normalizeString(artiCleaned);
@@ -469,8 +483,8 @@ const Qiraati: React.FC = () => {
         .sort((a, b) => b.score - a.score)
         .slice(0, 3)
         .map(item => item.surah.namaLatin);
-      const suggestionText = suggestions.length > 0 
-        ? `Coba: ${suggestions.join(', ')}` 
+      const suggestionText = suggestions.length > 0
+        ? `Coba: ${suggestions.join(', ')}`
         : 'Coba kata kunci lain seperti: Al-Fatihah, Yasin, Al-Baqarah, Al-Kafirun';
       toast({
         variant: "destructive",

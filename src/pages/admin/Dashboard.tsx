@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { LogOut, Home, Users, Image, Info, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -67,7 +67,7 @@ const Dashboard = () => {
             {adminNavigationItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
-              
+
               return (
                 <Link
                   key={item.path}
