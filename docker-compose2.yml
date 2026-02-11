@@ -1,5 +1,5 @@
 services:
-  qiraati-webapp:
+  qiraati-webapp-v2:
     build:
       context: .
       dockerfile: Dockerfile
@@ -8,14 +8,14 @@ services:
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
 
     ports:
-      - "8081:80"
+      - "8095:80"
     environment:
       - NODE_ENV=production
     restart: unless-stopped
     networks:
       - qiraati-network
     labels:
-      - "com.docker.compose.service=qiraati-webapp"
+      - "com.docker.compose.service=qiraati-webapp-v2"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost/" ]
       interval: 30s
