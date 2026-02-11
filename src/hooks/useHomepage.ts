@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { HomepageContent } from '@/types/database.types';
 
@@ -7,9 +7,17 @@ export const useHomepage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchContent = async () => {
+  const fetchContent = useCallback(async () => {
     try {
-      setLoading(true);
+      // Try to load from cache first for instant LCP
+      const cached = localStorage.getItem('homepage_content');
+      if (cached) {
+        setContent(JSON.parse(cached));
+        setLoading(false); // Immediate display
+      } else {
+        setLoading(true);
+      }
+
       setError(null);
 
       const { data, error } = await supabase
@@ -19,14 +27,19 @@ export const useHomepage = () => {
 
       if (error) throw error;
 
+      // Update state and cache
       setContent(data);
+      localStorage.setItem('homepage_content', JSON.stringify(data));
     } catch (err) {
       console.error('Error fetching homepage content:', err);
-      setError('Gagal mengambil konten homepage');
+      // Only set error if we don't have cached content
+      if (!localStorage.getItem('homepage_content')) {
+        setError('Gagal mengambil konten homepage');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const updateContent = async (updates: Partial<Omit<HomepageContent, 'id' | 'created_at' | 'updated_at'>>) => {
     try {
@@ -51,7 +64,7 @@ export const useHomepage = () => {
 
   useEffect(() => {
     fetchContent();
-  }, []);
+  }, [fetchContent]);
 
   return {
     content,

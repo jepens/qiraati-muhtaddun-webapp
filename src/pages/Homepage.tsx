@@ -1,21 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Clock, Users, Building2, Heart, Loader2 } from 'lucide-react';
+import { BookOpen, Clock, Users, Building2, Heart } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useHomepage } from '@/hooks/useHomepage';
+import { HomepageSkeleton } from '@/components/skeletons/HomepageSkeleton';
 
 const Homepage: React.FC = () => {
   const { content, loading } = useHomepage();
 
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[50vh]">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Memuat konten beranda...</p>
-        </div>
-      </div>
-    );
+    return <HomepageSkeleton />;
   }
 
   if (!content) {
