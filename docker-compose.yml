@@ -7,8 +7,8 @@ services:
         # Default values from .env.local
         VITE_SUPABASE_URL: "https://vqrtwwberevzvxmcycij.supabase.co"
         VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxcnR3d2JlcmV2enZ4bWN5Y2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxNDY0ODgsImV4cCI6MjA2NzcyMjQ4OH0.WD9swBhT3wMbEEPruCmouatFxCVlJ6HzVfGIx29E7Uc"
-    ports:
-      - "8095:80"
+    expose:
+      - "80"
     environment:
       - NODE_ENV=production
     restart: unless-stopped
