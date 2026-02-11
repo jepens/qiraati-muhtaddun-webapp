@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Inter:wght@400;500;600;700&display=swap');
+/* Google Fonts moved to index.html for performance */
 
 @tailwind base;
 @tailwind components;
@@ -9,32 +9,42 @@
 @layer base {
   :root {
     /* Warm, calming Islamic color palette */
-    --background: 47 25% 97%;          /* Warm cream background */
-    --foreground: 28 25% 15%;          /* Deep warm brown text */
+    --background: 47 25% 97%;
+    /* Warm cream background */
+    --foreground: 28 25% 15%;
+    /* Deep warm brown text */
 
-    --card: 45 30% 99%;                /* Slightly warmer white for cards */
+    --card: 45 30% 99%;
+    /* Slightly warmer white for cards */
     --card-foreground: 28 25% 15%;
 
     --popover: 45 30% 99%;
     --popover-foreground: 28 25% 15%;
 
     /* Islamic green as primary */
-    --primary: 158 45% 25%;            /* Deep Islamic green */
+    --primary: 158 45% 25%;
+    /* Deep Islamic green */
     --primary-foreground: 45 30% 99%;
-    --primary-glow: 158 60% 35%;       /* Lighter green for hover states */
+    --primary-glow: 158 60% 35%;
+    /* Lighter green for hover states */
 
     /* Warm secondary tones */
-    --secondary: 45 35% 88%;           /* Warm beige */
+    --secondary: 45 35% 88%;
+    /* Warm beige */
     --secondary-foreground: 28 25% 15%;
 
-    --muted: 45 25% 92%;               /* Soft warm gray */
-    --muted-foreground: 28 15% 35%;    /* Darker for 4.5:1 contrast */
+    --muted: 45 25% 92%;
+    /* Soft warm gray */
+    --muted-foreground: 28 15% 35%;
+    /* Darker for 4.5:1 contrast */
 
-    --accent: 38 65% 85%;              /* Soft gold accent */
+    --accent: 38 65% 85%;
+    /* Soft gold accent */
     --accent-foreground: 28 25% 15%;
 
     /* Warm gold highlights */
-    --gold: 43 85% 65%;                /* Islamic gold */
+    --gold: 43 85% 65%;
+    /* Islamic gold */
     --gold-foreground: 28 25% 15%;
 
     --destructive: 0 70% 55%;
@@ -230,6 +240,7 @@
       opacity: 0;
       transform: translateY(20px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -237,9 +248,12 @@
   }
 
   @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
       transform: scale(1);
     }
+
     50% {
       transform: scale(1.1);
     }

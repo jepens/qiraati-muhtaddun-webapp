@@ -22,7 +22,7 @@ import {
   Calendar,
   Search,
 } from 'lucide-react';
-import { useActivities } from '@/hooks/useActivities';
+import { useActivities } from '@/hooks/use-activities';
 import type { Activity } from '@/types/database.types';
 import GalleryManager from '@/components/admin/GalleryManager';
 import AboutManager from '@/components/admin/AboutManager';
