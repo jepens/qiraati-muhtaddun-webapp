@@ -160,12 +160,19 @@ const SurahDetail: React.FC = () => {
     }
   }, [surahData, isPlayingFull, playingAyat]);
 
+
+
+  const lastProcessedState = useRef<any>(null);
+
   // Handle auto-play from navigation state
   useEffect(() => {
-    if (loading || !surahData) return;
+    if (loading || !surahData || !location.state) return;
+    if (location.state === lastProcessedState.current) return;
 
+    // Check if autoplay is requested
     const state = location.state as { autoPlayAyat?: number };
     if (state?.autoPlayAyat) {
+      lastProcessedState.current = location.state; // Mark as processed
       // Wait a bit for audio refs and DOM to be ready
       setTimeout(() => {
         playAyat(state.autoPlayAyat!);
@@ -174,6 +181,8 @@ const SurahDetail: React.FC = () => {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
         // Clear state so it doesn't replay on refresh (optional, but good practice)
+        // However, we rely on ref now, so clearing is less critical but still good
+        // to prevent unintentional reuse if user navigates back
         window.history.replaceState({}, document.title);
       }, 1000);
     }
