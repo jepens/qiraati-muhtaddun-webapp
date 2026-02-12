@@ -6,6 +6,7 @@ import PrivateRoute from '@/components/PrivateRoute';
 import { AuthProvider } from '@/providers/auth-provider';
 import { ActivitiesProvider } from '@/providers/activities-provider';
 import { GalleryProvider } from '@/providers/gallery-provider';
+import { SmartReaderProvider } from '@/providers/SmartReaderContext';
 import LoadingFallback from '@/components/LoadingFallback';
 
 // Lazy load pages
@@ -27,31 +28,33 @@ function App() {
       <AuthProvider>
         <ActivitiesProvider>
           <GalleryProvider>
-            <Suspense fallback={<LoadingFallback />}>
-              <Routes>
-                <Route element={<Layout />}>
-                  <Route path="/" element={<Homepage />} />
-                  <Route path="/qiraati" element={<Qiraati />} />
-                  <Route path="/qiraati/surat/:id" element={<SurahDetail />} />
-                  <Route path="/game-hafalan" element={<GameHafalan />} />
-                  <Route path="/jadwal-sholat" element={<JadwalSholat />} />
-                  <Route path="/kegiatan" element={<Kegiatan />} />
-                  <Route path="/galeri" element={<Galeri />} />
-                  <Route path="/tentang-kami" element={<TentangKami />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route
-                    path="/admin/*"
-                    element={
-                      <PrivateRoute>
-                        <Dashboard />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route path="*" element={<NotFound />} />
-                </Route>
-              </Routes>
-            </Suspense>
-            <Toaster />
+            <SmartReaderProvider>
+              <Suspense fallback={<LoadingFallback />}>
+                <Routes>
+                  <Route element={<Layout />}>
+                    <Route path="/" element={<Homepage />} />
+                    <Route path="/qiraati" element={<Qiraati />} />
+                    <Route path="/qiraati/surat/:id" element={<SurahDetail />} />
+                    <Route path="/game-hafalan" element={<GameHafalan />} />
+                    <Route path="/jadwal-sholat" element={<JadwalSholat />} />
+                    <Route path="/kegiatan" element={<Kegiatan />} />
+                    <Route path="/galeri" element={<Galeri />} />
+                    <Route path="/tentang-kami" element={<TentangKami />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route
+                      path="/admin/*"
+                      element={
+                        <PrivateRoute>
+                          <Dashboard />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route path="*" element={<NotFound />} />
+                  </Route>
+                </Routes>
+              </Suspense>
+              <Toaster />
+            </SmartReaderProvider>
           </GalleryProvider>
         </ActivitiesProvider>
       </AuthProvider>

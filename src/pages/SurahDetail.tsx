@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Play, Pause, Volume2, VolumeX, Plus, Minus, ScrollText, FastForward, ScanFace } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { useSurahDetail } from '@/hooks/useQuran';
 import { useFaceScroll } from '@/hooks/useFaceScroll';
 import { useVoiceControl } from '@/hooks/useVoiceControl';
 import SmartReaderOverlay from '@/components/SmartReaderOverlay';
+import { useSmartReader } from '@/providers/SmartReaderHooks';
 
 const scrollSpeeds = {
   slow: 80,
@@ -25,6 +26,7 @@ const fontSizes = {
 const SurahDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { surah: surahData, loading } = useSurahDetail(id);
 
   const [isPlayingFull, setIsPlayingFull] = useState(false);
@@ -34,7 +36,7 @@ const SurahDetail: React.FC = () => {
   const [autoScroll, setAutoScroll] = useState(false);
   const [scrollSpeed, setScrollSpeed] = useState<'slow' | 'medium' | 'fast'>('medium');
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [isSmartMode, setIsSmartMode] = useState(false);
+  const { isSmartMode, setIsSmartMode } = useSmartReader();
 
   const ayatListRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -92,6 +94,8 @@ const SurahDetail: React.FC = () => {
     };
   }, [autoScroll, scrollSpeed]);
 
+
+
   const playFullSurah = () => {
     if (!surahData?.audioFull?.['01']) return;
 
@@ -115,7 +119,7 @@ const SurahDetail: React.FC = () => {
     }
   };
 
-  const playAyat = (ayatNumber: number) => {
+  const playAyat = React.useCallback((ayatNumber: number) => {
     if (!surahData) return;
 
     const ayat = surahData.ayat.find(a => a.nomorAyat === ayatNumber);
@@ -154,7 +158,46 @@ const SurahDetail: React.FC = () => {
         setPlayingAyat(null);
       };
     }
+  }, [surahData, isPlayingFull, playingAyat]);
+
+  // Handle auto-play from navigation state
+  useEffect(() => {
+    if (loading || !surahData) return;
+
+    const state = location.state as { autoPlayAyat?: number };
+    if (state?.autoPlayAyat) {
+      // Wait a bit for audio refs and DOM to be ready
+      setTimeout(() => {
+        playAyat(state.autoPlayAyat!);
+        const element = document.getElementById(`ayat-${state.autoPlayAyat}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        // Clear state so it doesn't replay on refresh (optional, but good practice)
+        window.history.replaceState({}, document.title);
+      }, 1000);
+    }
+  }, [loading, surahData, location.state, playAyat]);
+
+  const stopAllAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setIsPlayingFull(false);
+    }
+    setPlayingAyat(null);
+    Object.values(ayatAudioRefs.current).forEach(audio => {
+      audio.pause();
+      audio.currentTime = 0; // Reset time so it starts from beginning next time
+    });
+    setAutoScroll(false);
   };
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      stopAllAudio();
+    };
+  }, []);
 
   // Smart Reader Hooks integration
   const { videoRef, isReady: isFaceReady, error: faceError, debugRefs } = useFaceScroll({
@@ -166,22 +209,48 @@ const SurahDetail: React.FC = () => {
     }
   });
 
-  const { isListening, error: voiceError } = useVoiceControl({
+  const { isListening, isProcessing, error: voiceError } = useVoiceControl({
     enabled: isSmartMode,
-    onCommand: (command) => {
+    onCommand: (command, args) => {
       switch (command) {
         case 'play':
           playFullSurah();
           break;
+        case 'play_ayat':
+          if (args?.ayat) {
+            playAyat(args.ayat);
+            // Scroll to ayat
+            const element = document.getElementById(`ayat-${args.ayat}`);
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }
+          break;
+        case 'open_surah':
+        case 'open_surah_ayat':
+          if (args?.surah) {
+            stopAllAudio(); // Stop audio before navigating
+            // Logic to find surah ID from name (similar to Qiraati search)
+            // This requires access to all Surahs list or a helper. 
+            // For now, we'll implement a basic search or fetch if not available.
+            // Ideally, we move the search logic to a hook or utility.
+            // IMPORTANT: For this to work robustly, we need the Surah list.
+            // As a fallback/quick-fix, we can redirect to search page with query, 
+            // OR we can implement the search logic here if we have the data.
+            // Given we are inside SurahDetail, we only have single Surah data.
+            // Let's navigation to home with search query as simplest robust step 
+            // OR assuming we can get the ID via a quick fetch/lookup.
+
+            // BETTER APPROACH: Let's assume user wants to go to that surah.
+            // We can try to navigate to /qiraati/surat/[id] if we can match the name.
+            // Since we don't have the list here, let's navigate to Qiraati with a state/search param
+            navigate(`/qiraati?voice_search=${encodeURIComponent(args.surah)}&ayat=${args.ayat || ''}`);
+            // Note: isProcessing will be true for 2s in hook, providing feedback before nav completes
+          }
+          break;
         case 'pause':
         case 'stop':
-          if (audioRef.current) {
-            audioRef.current.pause();
-            setIsPlayingFull(false);
-          }
-          setPlayingAyat(null);
-          Object.values(ayatAudioRefs.current).forEach(audio => audio.pause());
-          setAutoScroll(false);
+          stopAllAudio();
           break;
         case 'scroll':
           setAutoScroll(true);
@@ -428,6 +497,7 @@ const SurahDetail: React.FC = () => {
               videoRef={videoRef}
               isReady={isFaceReady}
               isListening={isListening}
+              isProcessing={isProcessing}
               error={faceError || voiceError}
               debugRefs={debugRefs}
               onClose={() => setIsSmartMode(false)}
@@ -443,7 +513,7 @@ const SurahDetail: React.FC = () => {
             }}
           >
             {surahData.ayat.map((ayat) => (
-              <Card key={ayat.nomorAyat}>
+              <Card key={ayat.nomorAyat} id={`ayat-${ayat.nomorAyat}`}>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <span>Ayat {ayat.nomorAyat}</span>

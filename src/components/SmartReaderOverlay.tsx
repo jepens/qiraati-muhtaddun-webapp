@@ -7,6 +7,7 @@ interface SmartReaderOverlayProps {
     videoRef: React.RefObject<HTMLVideoElement>;
     isReady: boolean;
     isListening: boolean;
+    isProcessing?: boolean;
     error?: string | null;
     debugRefs?: { ratio: React.MutableRefObject<number>; speed: React.MutableRefObject<number> };
     onClose: () => void;
@@ -16,12 +17,13 @@ const SmartReaderOverlay: React.FC<SmartReaderOverlayProps> = ({
     videoRef,
     isReady,
     isListening,
+    isProcessing,
     error,
     debugRefs,
     onClose
 }) => {
     // Force re-render for debug info update
-    const [_, forceUpdate] = React.useReducer((x) => x + 1, 0);
+    const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
     React.useEffect(() => {
         if (!debugRefs) return;
         const interval = setInterval(() => forceUpdate(), 100); // 10fps debug view
@@ -42,6 +44,12 @@ const SmartReaderOverlay: React.FC<SmartReaderOverlayProps> = ({
                 {!isReady && !error && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
                         <Loader2 className="w-6 h-6 animate-spin" />
+                    </div>
+                )}
+                {isProcessing && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white backdrop-blur-sm z-10">
+                        <Loader2 className="w-8 h-8 animate-spin mb-1" />
+                        <span className="text-[10px] font-medium">Memproses...</span>
                     </div>
                 )}
                 {error && (
