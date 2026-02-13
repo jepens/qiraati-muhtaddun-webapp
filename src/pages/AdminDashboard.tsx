@@ -159,12 +159,12 @@ const AdminDashboard = () => {
 
   const getCategoryBadgeColor = (category: Activity['category']) => {
     switch (category) {
-      case 'kajian': return 'bg-blue-100 text-blue-800';
-      case 'sholat': return 'bg-green-100 text-green-800';
-      case 'sosial': return 'bg-purple-100 text-purple-800';
-      case 'pendidikan': return 'bg-orange-100 text-orange-800';
-      case 'lainnya': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'kajian': return 'bg-blue-600/20 text-blue-400';
+      case 'sholat': return 'bg-emerald-600/20 text-emerald-400';
+      case 'sosial': return 'bg-purple-600/20 text-purple-400';
+      case 'pendidikan': return 'bg-orange-600/20 text-orange-400';
+      case 'lainnya': return 'bg-zinc-600/20 text-zinc-400';
+      default: return 'bg-zinc-600/20 text-zinc-400';
     }
   };
 
@@ -311,7 +311,7 @@ const AdminDashboard = () => {
               <CardContent>
                 <div className="space-y-8">
                   <div className="flex items-center">
-                    <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center">
+                    <div className="w-9 h-9 bg-blue-600/20 rounded-full flex items-center justify-center">
                       <Users className="w-4 h-4 text-blue-600" />
                     </div>
                     <div className="ml-4 space-y-1">
@@ -323,8 +323,8 @@ const AdminDashboard = () => {
                   </div>
 
                   <div className="flex items-center">
-                    <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
+                    <div className="w-9 h-9 bg-emerald-600/20 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
                     </div>
                     <div className="ml-4 space-y-1">
                       <p className="text-sm font-medium leading-none">
@@ -335,7 +335,7 @@ const AdminDashboard = () => {
                   </div>
 
                   <div className="flex items-center">
-                    <div className="w-9 h-9 bg-purple-100 rounded-full flex items-center justify-center">
+                    <div className="w-9 h-9 bg-purple-600/20 rounded-full flex items-center justify-center">
                       <Calendar className="w-4 h-4 text-purple-600" />
                     </div>
                     <div className="ml-4 space-y-1">
@@ -347,7 +347,7 @@ const AdminDashboard = () => {
                   </div>
 
                   <div className="flex items-center">
-                    <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center">
+                    <div className="w-9 h-9 bg-orange-600/20 rounded-full flex items-center justify-center">
                       <AlertCircle className="w-4 h-4 text-orange-600" />
                     </div>
                     <div className="ml-4 space-y-1">
@@ -373,7 +373,7 @@ const AdminDashboard = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Kegiatan Aktif</span>
-                    <span className="text-2xl font-bold text-green-600">{stats.activeActivities}</span>
+                    <span className="text-2xl font-bold text-emerald-500">{stats.activeActivities}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Mendatang</span>
@@ -616,7 +616,7 @@ const AdminDashboard = () => {
                       <CardTitle className="text-sm">Kegiatan Aktif</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-green-600">{stats.activeActivities}</div>
+                      <div className="text-2xl font-bold text-emerald-500">{stats.activeActivities}</div>
                     </CardContent>
                   </Card>
 
@@ -714,7 +714,7 @@ const AdminDashboard = () => {
                                 {activity.is_active ? "Aktif" : "Nonaktif"}
                               </Badge>
                               {activity.is_active && (
-                                <Badge variant="outline" className={isUpcoming(activity.date, activity.time) ? "border-green-500 text-green-700" : "border-gray-500 text-gray-700"}>
+                                <Badge variant="outline" className={isUpcoming(activity.date, activity.time) ? "border-emerald-500 text-emerald-400" : "border-zinc-600 text-zinc-400"}>
                                   {isUpcoming(activity.date, activity.time) ? "Mendatang" : "Selesai"}
                                 </Badge>
                               )}
@@ -733,7 +733,7 @@ const AdminDashboard = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDeleteActivity(activity)}
-                                className="text-red-600 hover:text-red-800"
+                                className="text-red-500 hover:text-red-400"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -796,7 +796,7 @@ const AdminDashboard = () => {
                       <div className="space-y-2 text-sm">
                         <div><strong>Nama:</strong> Qiraati Muhtaddun</div>
                         <div><strong>Version:</strong> 1.0.0</div>
-                        <div><strong>Status:</strong> <span className="text-green-600">Online</span></div>
+                        <div><strong>Status:</strong> <span className="text-emerald-500">Online</span></div>
                         <div><strong>Masjid:</strong> Al-Muhtaddun</div>
                       </div>
                     </CardContent>

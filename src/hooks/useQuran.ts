@@ -1,139 +1,269 @@
-import { useState, useEffect } from 'react';
-import { QURAN_API, CACHE_CONFIG } from '@/lib/config';
-import { cache } from '@/lib/cache';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { quran, EQuranApiError } from '@/services/quranService';
 import { useToast } from '@/hooks/use-toast';
+import type {
+  Surat,
+  SuratDetail,
+  TafsirDetail,
+  TafsirAyat,
+  RandomAyat,
+} from '@/types/quran';
 
-interface Surah {
-  nomor: number;
-  nama: string;
-  namaLatin: string;
-  arti: string;
-  jumlahAyat: number;
-}
+type SuratNav = SuratDetail | null;
 
-interface SurahDetail extends Surah {
-  tempatTurun: string;
-  audioFull: Record<string, string>;
-  ayat: {
-    nomorAyat: number;
-    teksArab: string;
-    teksLatin: string;
-    terjemahan: string;
-    audio: Record<string, string>;
-  }[];
-}
-
+// ─── Core: Get All Surat ───
 export function useSurahList() {
-  const [surahs, setSurahs] = useState<Surah[]>([]);
+  const [surahs, setSurahs] = useState<Surat[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
+    let cancelled = false;
     const fetchSurahs = async () => {
       try {
-        // Check cache first
-        const cachedData = cache.get<Surah[]>('surah-list');
-        if (cachedData) {
-          setSurahs(cachedData);
-          setLoading(false);
-          return;
-        }
-
         setLoading(true);
-        const response = await fetch(QURAN_API.SURAH_LIST);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch surahs');
-        }
-        
-        const result = await response.json();
-        
-        if (result.code === 200 && result.data) {
-          setSurahs(result.data);
-          // Cache the data
-          cache.set('surah-list', result.data, CACHE_CONFIG.SURAH_LIST);
-        } else {
-          throw new Error('Invalid response format');
-        }
+        const data = await quran.getAllSurat();
+        if (!cancelled) setSurahs(data);
       } catch (error) {
         console.error('Error fetching surahs:', error);
-        toast({
-          title: "Error",
-          description: "Gagal memuat daftar surat. Silakan coba lagi nanti.",
-          variant: "destructive",
-        });
-        
-        // Fallback to basic surahs if API fails
-        const fallbackSurahs: Surah[] = [
-          { nomor: 1, nama: 'الفاتحة', namaLatin: 'Al-Fatihah', arti: 'Pembukaan', jumlahAyat: 7 },
-          { nomor: 2, nama: 'البقرة', namaLatin: 'Al-Baqarah', arti: 'Sapi Betina', jumlahAyat: 286 },
-          { nomor: 18, nama: 'الكهف', namaLatin: 'Al-Kahf', arti: 'Gua', jumlahAyat: 110 },
-          { nomor: 36, nama: 'يس', namaLatin: 'Yasin', arti: 'Yasin', jumlahAyat: 83 },
-          { nomor: 55, nama: 'الرحمن', namaLatin: 'Ar-Rahman', arti: 'Yang Maha Pengasih', jumlahAyat: 78 },
-          { nomor: 67, nama: 'الملك', namaLatin: 'Al-Mulk', arti: 'Kerajaan', jumlahAyat: 30 },
-          { nomor: 112, nama: 'الإخلاص', namaLatin: 'Al-Ikhlas', arti: 'Keikhlasan', jumlahAyat: 4 },
-        ];
-        setSurahs(fallbackSurahs);
+        if (error instanceof EQuranApiError) {
+          toast({
+            title: 'Error',
+            description: `Gagal memuat daftar surat (${error.statusCode}).`,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: 'Gagal memuat daftar surat. Silakan coba lagi nanti.',
+            variant: 'destructive',
+          });
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchSurahs();
+    return () => { cancelled = true; };
   }, [toast]);
 
   return { surahs, loading };
 }
 
+// ─── Core: Get Surat Detail ───
 export function useSurahDetail(id: string | undefined) {
-  const [surah, setSurah] = useState<SurahDetail | null>(null);
+  const [surah, setSurah] = useState<SuratDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    const fetchSurahDetail = async () => {
+    let cancelled = false;
+    const fetchDetail = async () => {
       if (!id) return;
-
       try {
-        // Check cache first
-        const cacheKey = `surah-detail-${id}`;
-        const cachedData = cache.get<SurahDetail>(cacheKey);
-        if (cachedData) {
-          setSurah(cachedData);
-          setLoading(false);
-          return;
-        }
-
         setLoading(true);
-        const response = await fetch(QURAN_API.SURAH_DETAIL(id));
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch surah details');
-        }
-        
-        const result = await response.json();
-        
-        if (result.code === 200 && result.data) {
-          setSurah(result.data);
-          // Cache the data
-          cache.set(cacheKey, result.data, CACHE_CONFIG.SURAH_DETAIL);
-        } else {
-          throw new Error('Invalid response format');
-        }
+        const data = await quran.getSurat(parseInt(id));
+        if (!cancelled) setSurah(data);
       } catch (error) {
-        console.error('Error fetching surah details:', error);
-        toast({
-          title: "Error",
-          description: "Gagal memuat detail surat. Silakan coba lagi nanti.",
-          variant: "destructive",
-        });
+        console.error('Error fetching surah detail:', error);
+        if (error instanceof EQuranApiError) {
+          toast({
+            title: 'Error',
+            description: `Gagal memuat surat (${error.statusCode}).`,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: 'Gagal memuat detail surat. Silakan coba lagi nanti.',
+            variant: 'destructive',
+          });
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchSurahDetail();
+    fetchDetail();
+    return () => { cancelled = true; };
   }, [id, toast]);
 
   return { surah, loading };
-} 
+}
+
+// ─── Core: Get Tafsir ───
+export function useTafsir(nomor: number | undefined) {
+  const [tafsir, setTafsir] = useState<TafsirDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchTafsir = async () => {
+      if (!nomor) return;
+      try {
+        setLoading(true);
+        const data = await quran.getTafsir(nomor);
+        if (!cancelled) setTafsir(data);
+      } catch (error) {
+        console.error('Error fetching tafsir:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchTafsir();
+    return () => { cancelled = true; };
+  }, [nomor]);
+
+  return { tafsir, loading };
+}
+
+// ─── Utility: Get Tafsir for Specific Ayat (on-demand) ───
+export function useTafsirAyat() {
+  const [tafsirAyat, setTafsirAyat] = useState<TafsirAyat | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchTafsirAyat = useCallback(async (suratNomor: number, ayatNomor: number) => {
+    try {
+      setLoading(true);
+      const data = await quran.getTafsirAyat(suratNomor, ayatNomor);
+      setTafsirAyat(data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching tafsir ayat:', error);
+      setTafsirAyat(null);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const reset = useCallback(() => {
+    setTafsirAyat(null);
+  }, []);
+
+  return { tafsirAyat, loading, fetchTafsirAyat, reset };
+}
+
+// ─── Utility: Random Ayat ───
+export function useRandomAyat() {
+  const [randomAyat, setRandomAyat] = useState<RandomAyat | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await quran.getRandomAyat();
+      setRandomAyat(data);
+    } catch (error) {
+      console.error('Error fetching random ayat:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { randomAyat, loading, refresh };
+}
+
+// ─── Audio: Qari List (synchronous) ───
+export function useQariList() {
+  // getQariList() is synchronous in equran SDK
+  const qariList = useMemo(() => {
+    try {
+      return quran.getQariList();
+    } catch {
+      return [];
+    }
+  }, []);
+
+  return { qariList, loading: false };
+}
+
+// ─── Helper: Surah Navigation ───
+export function useSurahNavigation(currentNomor: number | undefined) {
+  const [nextSurat, setNextSurat] = useState<SuratNav>(null);
+  const [prevSurat, setPrevSurat] = useState<SuratNav>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchNav = async () => {
+      if (!currentNomor) return;
+
+      try {
+        const [next, prev] = await Promise.allSettled([
+          quran.getNextSurat(currentNomor),
+          quran.getPrevSurat(currentNomor),
+        ]);
+
+        if (!cancelled) {
+          setNextSurat(next.status === 'fulfilled' ? next.value : null);
+          setPrevSurat(prev.status === 'fulfilled' ? prev.value : null);
+        }
+      } catch (error) {
+        console.error('Error fetching surah navigation:', error);
+      }
+    };
+
+    fetchNav();
+    return () => { cancelled = true; };
+  }, [currentNomor]);
+
+  return { nextSurat, prevSurat };
+}
+
+// ─── Helper: Makkiyah & Madaniyah Surat ───
+export function useSurahFilter() {
+  const [makkiyah, setMakkiyah] = useState<Surat[]>([]);
+  const [madaniyah, setMadaniyah] = useState<Surat[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchFiltered = useCallback(async (filter: 'makkiyah' | 'madaniyah') => {
+    try {
+      setLoading(true);
+      if (filter === 'makkiyah') {
+        const data = await quran.getMakkiyahSurat();
+        setMakkiyah(data);
+        return data;
+      } else {
+        const data = await quran.getMadaniyahSurat();
+        setMadaniyah(data);
+        return data;
+      }
+    } catch (error) {
+      console.error(`Error fetching ${filter} surat:`, error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { makkiyah, madaniyah, loading, fetchFiltered };
+}
+
+// ─── Audio: Get Audio URLs ───
+export function useAudioUrls() {
+  const getAudioFull = useCallback(async (suratNomor: number, qariId?: string) => {
+    try {
+      return await quran.getAudioFull(suratNomor, qariId);
+    } catch (error) {
+      console.error('Error fetching audio full:', error);
+      return null;
+    }
+  }, []);
+
+  const getAudioAyat = useCallback(async (suratNomor: number, ayatNomor: number, qariId?: string) => {
+    try {
+      return await quran.getAudioAyat(suratNomor, ayatNomor, qariId);
+    } catch (error) {
+      console.error('Error fetching audio ayat:', error);
+      return null;
+    }
+  }, []);
+
+  return { getAudioFull, getAudioAyat };
+}

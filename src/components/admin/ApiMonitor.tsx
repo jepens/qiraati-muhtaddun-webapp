@@ -2,11 +2,11 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  RefreshCw, 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
+import {
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
   Clock,
   Database,
   Server,
@@ -30,7 +30,7 @@ const ApiMonitor: React.FC = () => {
       case 'checking':
         return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
       default:
-        return <Clock className="w-4 h-4 text-gray-500" />;
+        return <Clock className="w-4 h-4 text-zinc-400" />;
     }
   };
 
@@ -51,7 +51,7 @@ const ApiMonitor: React.FC = () => {
 
   const getServiceIcon = (serviceName: string) => {
     if (serviceName.includes('Supabase')) {
-      return <Database className="w-5 h-5 text-green-600" />;
+      return <Database className="w-5 h-5 text-emerald-500" />;
     } else if (serviceName.includes('Backend') || serviceName.includes('Quran')) {
       return <Server className="w-5 h-5 text-blue-600" />;
     } else {
@@ -62,13 +62,13 @@ const ApiMonitor: React.FC = () => {
   const getOverallStatusColor = () => {
     switch (overallStatus) {
       case 'healthy':
-        return 'text-green-600 bg-green-50 border-green-200';
+        return 'text-green-500 bg-green-600/10 border-green-500/30';
       case 'warning':
-        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+        return 'text-yellow-500 bg-yellow-600/10 border-yellow-500/30';
       case 'critical':
-        return 'text-red-600 bg-red-50 border-red-200';
+        return 'text-red-500 bg-red-600/10 border-red-500/30';
       default:
-        return 'text-gray-600 bg-gray-50 border-gray-200';
+        return 'text-zinc-400 bg-zinc-600/10 border-zinc-500/30';
     }
   };
 
@@ -146,7 +146,7 @@ const ApiMonitor: React.FC = () => {
                   <span className="text-sm text-muted-foreground">Status:</span>
                   {getStatusBadge(api.status)}
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">URL:</span>
                   <span className="text-sm font-mono text-right truncate max-w-[200px]" title={api.url}>
@@ -171,8 +171,8 @@ const ApiMonitor: React.FC = () => {
                 </div>
 
                 {api.errorMessage && (
-                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                    <p className="text-xs text-red-700">
+                  <div className="mt-2 p-2 bg-red-600/10 border border-red-500/30 rounded">
+                    <p className="text-xs text-red-400">
                       <strong>Error:</strong> {api.errorMessage}
                     </p>
                   </div>

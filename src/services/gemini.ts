@@ -17,7 +17,7 @@ Tugas Anda adalah menjawab pertanyaan pengguna berdasarkan konteks ayat-ayat Al-
 PEDOMAN JAWABAN:
 1.  **Gunakan Konteks:** Jawab HANYA berdasarkan informasi yang ada dalam bagian "KONTEKS DARI VEKTOR SEARCH" di bawah. 
     *   Prioritaskan referensi dengan **Skor Relevansi Tinggi**.
-    *   Jika skor di bawah 0.70, gunakan info tersebut dengan hati-hati atau sebagai pendukung saja.
+    *   Jika skor di bawah 0.40, gunakan info tersebut dengan hati-hati atau sebagai pendukung saja.
     *   Jangan mengarang dalil baru di luar konteks yang diberikan.
 2.  **Gaya Bahasa:** Gunakan bahasa Indonesia yang baik, sopan, dan menyejukkan hati. Sapa pengguna dengan panggilan sopan jika perlu.
 3.  **Struktur Jawaban:**
@@ -61,6 +61,8 @@ export const generateGeminiResponse = async (
 
                 if (item.tipe === "ayat") {
                     return `[Referensi ${index + 1}] ${meta}\nSurah: ${data.nama_surat} (${data.nomor_ayat})\nArab: ${data.teks_arab}\nTerjemahan: ${data.terjemahan_id}`;
+                } else if (item.tipe === "doa") {
+                    return `[Referensi ${index + 1}] ${meta}\nDoa: ${data.judul} \nArab: ${data.teks_arab}\nLatin: ${data.teks_latin}\nArti: ${data.terjemahan_id || data.terjemahan}\nKeterangan: ${data.catatan || "-"}`;
                 } else {
                     return `[Referensi ${index + 1}] ${meta}\nTafsir ${data.nama_surat} ayat ${data.nomor_ayat}: ${data.isi}`;
                 }

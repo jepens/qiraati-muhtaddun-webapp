@@ -4,67 +4,63 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Islamic-themed warm design system for Masjid Al-Muhtaddun & Qiraati */
+/* Premium Dark Theme — Masjid Al-Muhtaddun & Qiraati */
+/* Emerald Green + Gold + Black */
 
 @layer base {
   :root {
-    /* Warm, calming Islamic color palette */
-    --background: 47 25% 97%;
-    /* Warm cream background */
-    --foreground: 28 25% 15%;
-    /* Deep warm brown text */
+    /* Rich Black backgrounds */
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
 
-    --card: 45 30% 99%;
-    /* Slightly warmer white for cards */
-    --card-foreground: 28 25% 15%;
+    /* Elevated surfaces */
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 45 30% 99%;
-    --popover-foreground: 28 25% 15%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
 
-    /* Islamic green as primary */
-    --primary: 158 45% 25%;
-    /* Deep Islamic green */
-    --primary-foreground: 45 30% 99%;
-    --primary-glow: 158 60% 35%;
-    /* Lighter green for hover states */
+    /* Emerald Green as primary */
+    --primary: 160 84% 39%;
+    /* #10B981 */
+    --primary-foreground: 0 0% 98%;
+    --primary-glow: 160 72% 50%;
+    /* Lighter emerald for hover/glow */
 
-    /* Warm secondary tones */
-    --secondary: 45 35% 88%;
-    /* Warm beige */
-    --secondary-foreground: 28 25% 15%;
+    /* Dark secondary tones */
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 90%;
 
-    --muted: 45 25% 92%;
-    /* Soft warm gray */
-    --muted-foreground: 28 15% 35%;
-    /* Darker for 4.5:1 contrast */
+    /* Smoke White for muted text */
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 63.9%;
 
-    --accent: 38 65% 85%;
-    /* Soft gold accent */
-    --accent-foreground: 28 25% 15%;
+    /* Emerald accent */
+    --accent: 160 84% 39%;
+    --accent-foreground: 0 0% 98%;
 
-    /* Warm gold highlights */
+    /* Islamic gold highlights */
     --gold: 43 85% 65%;
-    /* Islamic gold */
-    --gold-foreground: 28 25% 15%;
+    --gold-foreground: 0 0% 3.9%;
 
-    --destructive: 0 70% 55%;
-    --destructive-foreground: 45 30% 99%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 45 20% 85%;
-    --input: 45 25% 90%;
-    --ring: 158 45% 25%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 160 84% 39%;
 
     --radius: 0.75rem;
 
     /* Prayer time highlight */
-    --prayer-active: 158 85% 35%;
-    --prayer-next: 43 75% 75%;
+    --prayer-active: 160 84% 39%;
+    --prayer-next: 43 75% 65%;
 
     /* Shadows and gradients */
-    --shadow-warm: 28 25% 15% / 0.08;
-    --gradient-mosque: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --shadow-dark: 0 0% 0% / 0.4;
+    --gradient-mosque: linear-gradient(135deg, hsl(160 84% 35%), hsl(160 72% 45%));
     --gradient-gold: linear-gradient(135deg, hsl(var(--gold)), hsl(43 95% 75%));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(45 30% 95%));
+    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(0 0% 6%));
 
     /* Animations */
     --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -77,59 +73,15 @@
     --font-size-arabic-lg: 2.5rem;
     --font-size-arabic-xl: 3rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
+    /* Sidebar */
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 160 84% 39%;
     --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 0 0% 10%;
+    --sidebar-accent-foreground: 0 0% 90%;
+    --sidebar-border: 0 0% 14.9%;
+    --sidebar-ring: 160 84% 39%;
   }
 }
 
@@ -143,27 +95,28 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
-  /* Arabic text styling */
+  /* Arabic text styling — Emerald Green */
   .arabic-text {
     font-family: 'Amiri', 'Traditional Arabic', serif;
     direction: rtl;
     text-align: right;
     line-height: 2;
     letter-spacing: 0.02em;
+    color: hsl(var(--primary));
   }
 
-  /* Large button variants for elderly users */
+  /* Large button variants — Emerald gradient */
   .btn-mosque {
     @apply px-8 py-6 text-lg font-semibold rounded-xl;
     background: var(--gradient-mosque);
     color: hsl(var(--primary-foreground));
     transition: var(--transition-gentle);
-    box-shadow: 0 4px 16px hsl(var(--shadow-warm));
+    box-shadow: 0 4px 16px hsl(var(--shadow-dark));
   }
 
   .btn-mosque:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px hsl(var(--shadow-warm));
+    box-shadow: 0 8px 24px hsl(160 84% 39% / 0.3);
   }
 
   .btn-qiraati {
@@ -171,12 +124,12 @@
     background: var(--gradient-gold);
     color: hsl(var(--gold-foreground));
     transition: var(--transition-gentle);
-    box-shadow: 0 6px 20px hsl(var(--shadow-warm));
+    box-shadow: 0 6px 20px hsl(var(--shadow-dark));
   }
 
   .btn-qiraati:hover {
     transform: translateY(-3px);
-    box-shadow: 0 12px 32px hsl(var(--shadow-warm));
+    box-shadow: 0 12px 32px hsl(43 85% 65% / 0.3);
   }
 
   /* Microphone button for voice search */
@@ -185,12 +138,12 @@
     background: var(--gradient-mosque);
     color: hsl(var(--primary-foreground));
     transition: var(--transition-smooth);
-    box-shadow: 0 8px 32px hsl(var(--shadow-warm));
+    box-shadow: 0 8px 32px hsl(160 84% 39% / 0.2);
   }
 
   .btn-microphone:hover {
     transform: scale(1.05);
-    box-shadow: 0 12px 40px hsl(var(--shadow-warm));
+    box-shadow: 0 12px 40px hsl(160 84% 39% / 0.3);
   }
 
   .btn-microphone.recording {

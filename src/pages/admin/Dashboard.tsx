@@ -34,9 +34,9 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white shadow-lg border-b-2 border-border">
+      <header className="bg-card shadow-lg border-b-2 border-border">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             {/* Logo/Title */}
@@ -61,7 +61,7 @@ const Dashboard = () => {
       </header>
 
       {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-border">
+      <nav className="bg-card shadow-sm border-b border-border">
         <div className="container mx-auto px-4 py-2">
           <div className="flex flex-wrap justify-center md:justify-start gap-2">
             {adminNavigationItems.map((item) => {
@@ -90,7 +90,7 @@ const Dashboard = () => {
       </nav>
 
       {/* Content */}
-      <main className="flex-1 bg-gray-50">
+      <main className="flex-1 bg-background">
         <Routes>
           <Route path="beranda" element={<AdminBeranda />} />
           <Route path="kegiatan" element={<AdminKegiatan />} />

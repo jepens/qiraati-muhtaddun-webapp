@@ -9,11 +9,11 @@ import { useActivities } from '@/hooks/use-activities';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const categoryColors = {
-  kajian: 'bg-blue-500',
-  sholat: 'bg-green-500',
-  sosial: 'bg-yellow-500',
-  pendidikan: 'bg-purple-500',
-  lainnya: 'bg-gray-500',
+  kajian: 'bg-blue-600',
+  sholat: 'bg-emerald-600',
+  sosial: 'bg-amber-600',
+  pendidikan: 'bg-purple-600',
+  lainnya: 'bg-zinc-600',
 };
 
 const Kegiatan: React.FC = () => {

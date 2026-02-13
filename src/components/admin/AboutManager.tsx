@@ -252,7 +252,7 @@ const AboutManager: React.FC = () => {
             {content?.google_maps_embed && (
               <div className="space-y-2">
                 <Label>Preview Peta</Label>
-                <div className="w-full h-80 border rounded-md overflow-hidden bg-gray-50">
+                <div className="w-full h-80 border rounded-md overflow-hidden bg-card">
                   {content.google_maps_embed.startsWith('http') ? (
                     <iframe
                       src={content.google_maps_embed}

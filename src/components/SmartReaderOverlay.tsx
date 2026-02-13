@@ -8,6 +8,7 @@ interface SmartReaderOverlayProps {
     isReady: boolean;
     isListening: boolean;
     isProcessing?: boolean;
+    lastCommand?: string | null;
     error?: string | null;
     debugRefs?: { ratio: React.MutableRefObject<number>; speed: React.MutableRefObject<number> };
     onClose: () => void;
@@ -18,6 +19,7 @@ const SmartReaderOverlay: React.FC<SmartReaderOverlayProps> = ({
     isReady,
     isListening,
     isProcessing,
+    lastCommand,
     error,
     debugRefs,
     onClose
@@ -81,6 +83,11 @@ const SmartReaderOverlay: React.FC<SmartReaderOverlayProps> = ({
                 <p className="text-[10px] text-muted-foreground leading-tight">
                     {error ? "Terjadi kesalahan sistem." : 'Tundukkan kepala untuk scroll. Ucapkan "Putar".'}
                 </p>
+                {lastCommand && (
+                    <div className="mt-1 px-2 py-1 bg-green-500/15 border border-green-500/40 rounded text-[10px] text-green-400 text-center font-medium animate-in fade-in duration-300">
+                        ✓ {lastCommand}
+                    </div>
+                )}
                 <button
                     onClick={onClose}
                     className="w-full mt-1 text-[10px] text-red-500 hover:text-red-600 font-medium py-1"

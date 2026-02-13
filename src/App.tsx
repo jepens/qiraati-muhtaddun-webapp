@@ -18,7 +18,11 @@ const JadwalSholat = React.lazy(() => import('@/pages/JadwalSholat'));
 const Kegiatan = React.lazy(() => import('@/pages/Kegiatan'));
 const Galeri = React.lazy(() => import('@/pages/Galeri'));
 const TentangKami = React.lazy(() => import('@/pages/TentangKami'));
-const GameHafalan = React.lazy(() => import('@/pages/GameHafalan'));
+const GameLayout = React.lazy(() => import('@/pages/game/GameLayout'));
+const GameHub = React.lazy(() => import('@/pages/game/GameHub'));
+const TebakAyat = React.lazy(() => import('@/pages/game/TebakAyat'));
+const MemoryCard = React.lazy(() => import('@/pages/game/MemoryCard'));
+const SambungAyat = React.lazy(() => import('@/pages/game/SambungAyat'));
 const NotFound = React.lazy(() => import('@/pages/NotFound'));
 const Login = React.lazy(() => import('@/pages/Login'));
 const Dashboard = React.lazy(() => import('@/pages/admin/Dashboard'));
@@ -42,7 +46,12 @@ function App() {
                       <Route path="/" element={<Homepage />} />
                       <Route path="/qiraati" element={<Qiraati />} />
                       <Route path="/qiraati/surat/:id" element={<SurahDetail />} />
-                      <Route path="/game-hafalan" element={<GameHafalan />} />
+                      <Route path="/game" element={<GameLayout />}>
+                        <Route index element={<GameHub />} />
+                        <Route path="tebak-ayat" element={<TebakAyat />} />
+                        <Route path="memory-card" element={<MemoryCard />} />
+                        <Route path="sambung-ayat" element={<SambungAyat />} />
+                      </Route>
                       <Route path="/jadwal-sholat" element={<JadwalSholat />} />
                       <Route path="/kegiatan" element={<Kegiatan />} />
                       <Route path="/galeri" element={<Galeri />} />

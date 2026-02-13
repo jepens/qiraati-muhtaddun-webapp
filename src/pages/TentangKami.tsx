@@ -204,7 +204,7 @@ const TentangKami: React.FC = () => {
             {content?.google_maps_embed && content.google_maps_embed.startsWith('http') && (
               <div className="mt-8">
                 <h4 className="text-elderly-lg font-semibold mb-4 text-center">Lokasi Masjid</h4>
-                <div className="w-full h-80 rounded-lg overflow-hidden border-2 border-primary/20 bg-gray-50">
+                <div className="w-full h-80 rounded-lg overflow-hidden border-2 border-primary/20 bg-card">
                   <iframe
                     src={content.google_maps_embed}
                     width="100%"

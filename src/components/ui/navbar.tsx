@@ -17,13 +17,13 @@ const navigationItems = [
   { name: 'Beranda', path: '/', icon: Home },
   { name: 'Qiraati', path: '/qiraati', icon: BookOpen },
   { name: 'Doa', path: '/doa', icon: Heart },
-  { name: 'Game Hafalan', path: '/game-hafalan', icon: Gamepad2 },
+  { name: 'Game Hub', path: '/game', icon: Gamepad2 },
   { name: 'Jadwal Sholat', path: '/jadwal-sholat', icon: Clock },
   { name: 'Kegiatan', path: '/kegiatan', icon: Users },
   { name: 'Galeri', path: '/galeri', icon: Image },
   { name: 'Tentang Kami', path: '/tentang-kami', icon: Info },
   { name: 'AI Chat', path: '/ai-chat', icon: Sparkles },
-  { name: 'AI Chat', path: '/ai-chat', icon: Sparkles },
+
 ];
 
 export const Navbar = () => {
@@ -50,7 +50,8 @@ export const Navbar = () => {
             {navigationItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path ||
-                (item.path === '/qiraati' && location.pathname.startsWith('/qiraati'));
+                (item.path === '/qiraati' && location.pathname.startsWith('/qiraati')) ||
+                (item.path === '/game' && location.pathname.startsWith('/game'));
 
               return (
                 <Link

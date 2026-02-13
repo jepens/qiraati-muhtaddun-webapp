@@ -11,6 +11,14 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      '/equran-api': {
+        target: 'https://equran.id/api/v2',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/equran-api/, ''),
+        secure: true,
+      },
+    },
   },
   plugins: [
     react(),
