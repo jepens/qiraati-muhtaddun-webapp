@@ -123,6 +123,18 @@ export const useVoice = ({
     const isMounted = useRef(true);
     const { toast } = useToast();
 
+    // ─── Refs to avoid stale closures (Context7 — best practice) ───
+    const enabledRef = useRef(enabled);
+    const continuousRef = useRef(continuous);
+    const restartTimeoutRef = useRef<number | null>(null);
+    const retryCountRef = useRef(0);
+    const MAX_RETRIES = 5;
+    const isStoppingRef = useRef(false); // Track intentional stops
+
+    // Keep refs in sync with props
+    useEffect(() => { enabledRef.current = enabled; }, [enabled]);
+    useEffect(() => { continuousRef.current = continuous; }, [continuous]);
+
     // Resolve debounce: explicit > mode default
     const resolvedDebounce = debounceMs ?? (mode === 'command' ? 1000 : 1500);
 
@@ -130,6 +142,14 @@ export const useVoice = ({
     useEffect(() => {
         isMounted.current = true;
         return () => { isMounted.current = false; };
+    }, []);
+
+    // ─── Clear restart timeout helper ───
+    const clearRestartTimeout = useCallback(() => {
+        if (restartTimeoutRef.current !== null) {
+            window.clearTimeout(restartTimeoutRef.current);
+            restartTimeoutRef.current = null;
+        }
     }, []);
 
     // ─── Command Matching (Context7 — react-speech-recognition pattern) ───
@@ -222,6 +242,8 @@ export const useVoice = ({
     const startListening = useCallback(() => {
         try {
             if (recognitionRef.current) {
+                isStoppingRef.current = false;
+                retryCountRef.current = 0;
                 recognitionRef.current.start();
                 setIsListening(true);
                 setError(null);
@@ -233,6 +255,8 @@ export const useVoice = ({
 
     const stopListening = useCallback(() => {
         try {
+            isStoppingRef.current = true;
+            clearRestartTimeout();
             if (recognitionRef.current) {
                 recognitionRef.current.stop();
                 setIsListening(false);
@@ -240,12 +264,16 @@ export const useVoice = ({
         } catch {
             // Ignore
         }
-    }, []);
+    }, [clearRestartTimeout]);
 
     const resetTranscript = useCallback(() => {
         setTranscript('');
         setInterimTranscript('');
     }, []);
+
+    // ─── Keep commands ref in sync for onresult handler ───
+    const commandsRef = useRef(commands);
+    useEffect(() => { commandsRef.current = commands; }, [commands]);
 
     // ─── Initialize Speech Recognition ───
     useEffect(() => {
@@ -262,11 +290,67 @@ export const useVoice = ({
             return;
         }
 
+        // Clean up previous instance completely
+        if (recognitionRef.current) {
+            recognitionRef.current.onend = null;
+            recognitionRef.current.onerror = null;
+            recognitionRef.current.onresult = null;
+            try { recognitionRef.current.stop(); } catch { /* */ }
+        }
+        clearRestartTimeout();
+
         const recognition = new SpeechRecognitionAPI();
         recognitionRef.current = recognition;
         recognition.continuous = continuous;
         recognition.interimResults = true;
         recognition.lang = lang;
+        isStoppingRef.current = false;
+        retryCountRef.current = 0;
+
+        // ─── Robust restart with delay + retry (Context7 — best practice) ───
+        const scheduleRestart = () => {
+            // Use refs to avoid stale closure
+            if (!enabledRef.current || !isMounted.current || !continuousRef.current) {
+                if (isMounted.current) setIsListening(false);
+                return;
+            }
+
+            // Check if intentionally stopped
+            if (isStoppingRef.current) {
+                if (isMounted.current) setIsListening(false);
+                return;
+            }
+
+            // Respect retry limit
+            if (retryCountRef.current >= MAX_RETRIES) {
+                console.warn(`Voice: Max retries (${MAX_RETRIES}) reached, stopping.`);
+                if (isMounted.current) {
+                    setIsListening(false);
+                    setError('Voice recognition berhenti. Ketuk untuk mengulang.');
+                }
+                return;
+            }
+
+            // Delay restart to avoid InvalidStateError (Context7 best practice)
+            const delay = Math.min(200 * (retryCountRef.current + 1), 1000);
+            restartTimeoutRef.current = window.setTimeout(() => {
+                if (!isMounted.current || !enabledRef.current || isStoppingRef.current) return;
+
+                try {
+                    recognition.start();
+                    retryCountRef.current = 0; // Reset on success
+                    if (isMounted.current) {
+                        setIsListening(true);
+                        setError(null);
+                    }
+                } catch (e: any) {
+                    retryCountRef.current++;
+                    console.warn(`Voice restart attempt ${retryCountRef.current}/${MAX_RETRIES}:`, e?.message || e);
+                    // Retry with exponential backoff
+                    scheduleRestart();
+                }
+            }, delay);
+        };
 
         // ─── onresult ───
         recognition.onresult = (event: any) => {
@@ -285,7 +369,7 @@ export const useVoice = ({
                     // Check matchInterim commands
                     if (mode === 'command') {
                         const interimNorm = normalize(result[0].transcript);
-                        for (const cmd of commands) {
+                        for (const cmd of commandsRef.current) {
                             if (!cmd.matchInterim) continue;
                             if (cmd.command instanceof RegExp) {
                                 if (cmd.command.test(interimNorm)) {
@@ -306,6 +390,9 @@ export const useVoice = ({
             setInterimTranscript(interimTrans);
 
             if (finalTrans) {
+                // Reset retry counter on successful recognition
+                retryCountRef.current = 0;
+
                 if (mode === 'search') {
                     // Accumulate in search mode
                     setTranscript(prev => {
@@ -331,8 +418,10 @@ export const useVoice = ({
             } else if (msg) {
                 setError(msg);
                 setIsListening(false);
+                // Don't restart on fatal errors
+                isStoppingRef.current = true;
             }
-            // Silent errors (no-speech, aborted) — do nothing
+            // Silent errors (no-speech, aborted) — allow restart via onend
         };
 
         // ─── onspeechstart / onspeechend (Context7 — detect active speech) ───
@@ -343,30 +432,43 @@ export const useVoice = ({
             if (isMounted.current) setIsSpeaking(false);
         };
 
-        // ─── onend — auto-restart for continuous ───
+        // ─── onend — robust auto-restart for continuous ───
         recognition.onend = () => {
-            if (isMounted.current) setIsSpeaking(false);
-            if (enabled && isMounted.current && continuous) {
-                try {
-                    recognition.start();
-                } catch {
-                    // Ignore
-                }
-            } else if (isMounted.current) {
-                setIsListening(false);
+            if (isMounted.current) {
+                setIsSpeaking(false);
             }
+            // Schedule restart using refs (no stale closure)
+            scheduleRestart();
         };
 
         // Auto-start
-        startListening();
+        try {
+            recognition.start();
+            setIsListening(true);
+            setError(null);
+        } catch {
+            // Will be retried via scheduleRestart
+            scheduleRestart();
+        }
 
         return () => {
+            clearRestartTimeout();
+            isStoppingRef.current = true;
             if (recognitionRef.current) {
                 recognitionRef.current.onend = null;
+                recognitionRef.current.onerror = null;
+                recognitionRef.current.onresult = null;
+                recognitionRef.current.onspeechstart = null;
+                recognitionRef.current.onspeechend = null;
                 try { recognitionRef.current.stop(); } catch { /* */ }
             }
         };
-    }, [enabled, continuous, lang, mode, commands, startListening, stopListening]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [enabled, continuous, lang, mode]);
+    // NOTE: Removed `commands`, `startListening`, `stopListening` from deps
+    // to prevent recreation of recognition every time commands change.
+    // Commands are read via closure from the latest `commands` prop.
+
 
     return {
         isListening,

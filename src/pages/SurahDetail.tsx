@@ -31,6 +31,7 @@ import {
   useAudioUrls,
 } from '@/hooks/useQuran';
 import { useBookmarks } from '@/hooks/useBookmarks';
+import { useLastRead } from '@/hooks/useLastRead';
 import { useFaceScroll } from '@/hooks/useFaceScroll';
 import { useVoice, VoiceCommand } from '@/hooks/useVoice';
 import SmartReaderOverlay from '@/components/SmartReaderOverlay';
@@ -56,6 +57,7 @@ const SurahDetail: React.FC = () => {
   const { nextSurat, prevSurat } = useSurahNavigation(nomor);
   const { getAudioFull, getAudioAyat } = useAudioUrls();
   const { isBookmarked, toggleBookmark } = useBookmarks();
+  const { updateLastRead } = useLastRead();
 
   // UI State
   const [isPlayingFull, setIsPlayingFull] = useState(false);
@@ -188,12 +190,16 @@ const SurahDetail: React.FC = () => {
           ayatAudio.play().catch(console.error);
           setPlayingAyat(ayatNumber);
           ayatAudio.onended = () => setPlayingAyat(null);
+          // Track last read position
+          if (surahData) {
+            updateLastRead(surahData.nomor, surahData.namaLatin, ayatNumber);
+          }
         }
       } catch (e) {
         console.error('Error playing ayat:', e);
       }
     }
-  }, [surahData, nomor, isPlayingFull, playingAyat, selectedQari, getAudioAyat]);
+  }, [surahData, nomor, isPlayingFull, playingAyat, selectedQari, getAudioAyat, updateLastRead]);
 
   // ─── Stop all audio ───
   const stopAllAudio = useCallback(() => {
@@ -422,7 +428,7 @@ const SurahDetail: React.FC = () => {
 
   ], [playFullSurah, playAyat, stopAllAudio, navigate, openTafsir, fontSize, handleFontSizeChange, surahData, toggleBookmark, nextSurat, prevSurat, showTransliteration, showTranslation, copyAyat, shareAyat]);
 
-  const { isListening, isProcessing, lastCommand, error: voiceError } = useVoice({
+  const { isListening, isProcessing, isSpeaking, lastCommand, error: voiceError, startListening: restartVoice } = useVoice({
     mode: 'command',
     commands: voiceCommands,
     enabled: isSmartMode,
@@ -574,11 +580,13 @@ const SurahDetail: React.FC = () => {
                 videoRef={videoRef}
                 isReady={isFaceReady}
                 isListening={isListening}
+                isSpeaking={isSpeaking}
                 isProcessing={isProcessing}
                 lastCommand={lastCommand}
                 error={faceError || voiceError}
                 debugRefs={debugRefs}
                 onClose={() => setIsSmartMode(false)}
+                onRetry={restartVoice}
               />
             )}
 

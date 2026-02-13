@@ -29,6 +29,7 @@ const Dashboard = React.lazy(() => import('@/pages/admin/Dashboard'));
 const Doa = React.lazy(() => import('@/pages/Doa'));
 const DoaDetail = React.lazy(() => import('@/pages/DoaDetail'));
 const AIChat = React.lazy(() => import('@/pages/AIChat'));
+const Bookmark = React.lazy(() => import('@/pages/Bookmark'));
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ function App() {
                       <Route path="/doa" element={<Doa />} />
                       <Route path="/doa/:id" element={<DoaDetail />} />
                       <Route path="/ai-chat" element={<AIChat />} />
+                      <Route path="/bookmark" element={<Bookmark />} />
                       <Route
                         path="/admin/*"
                         element={

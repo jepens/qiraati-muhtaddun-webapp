@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Clock, Users, Info, Image, LogIn, Gamepad2, Heart, Sparkles, LogOut } from 'lucide-react';
+import { Home, BookOpen, Clock, Users, Info, Image, LogIn, Gamepad2, Heart, Sparkles, LogOut, Bookmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -104,6 +104,13 @@ const AuthButtons = () => {
               <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
             </div>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild className="cursor-pointer">
+            <Link to="/bookmark">
+              <Bookmark className="mr-2 h-4 w-4" />
+              <span>Bookmark</span>
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive focus:text-destructive">
             <LogOut className="mr-2 h-4 w-4" />
