@@ -62,16 +62,17 @@ function App() {
                       <Route path="/doa/:id" element={<DoaDetail />} />
                       <Route path="/ai-chat" element={<AIChat />} />
                       <Route path="/bookmark" element={<Bookmark />} />
-                      <Route
-                        path="/admin/*"
-                        element={
-                          <PrivateRoute>
-                            <Dashboard />
-                          </PrivateRoute>
-                        }
-                      />
                       <Route path="*" element={<NotFound />} />
                     </Route>
+                    {/* Admin routes — outside Layout to use its own sidebar layout */}
+                    <Route
+                      path="/admin/*"
+                      element={
+                        <PrivateRoute>
+                          <Dashboard />
+                        </PrivateRoute>
+                      }
+                    />
                   </Routes>
                 </Suspense>
                 <Toaster />
