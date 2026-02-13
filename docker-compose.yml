@@ -4,9 +4,12 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # Default values from .env.local
-        VITE_SUPABASE_URL: "https://vqrtwwberevzvxmcycij.supabase.co"
-        VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxcnR3d2JlcmV2enZ4bWN5Y2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIxNDY0ODgsImV4cCI6MjA2NzcyMjQ4OH0.WD9swBhT3wMbEEPruCmouatFxCVlJ6HzVfGIx29E7Uc"
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY}
+
+    ports:
+      - "80:80"
     expose:
       - "80"
     environment:
@@ -36,13 +39,13 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Backend API proxy (REQUIRED for Quran & Prayer Times)
+  # Backend API (uncomment jika diperlukan)
   qiraati-api:
     build:
       context: ./backend-example
       dockerfile: Dockerfile
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -51,7 +54,37 @@ services:
       - qiraati-network
     depends_on:
       - qiraati-webapp
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+  # Nginx Reverse Proxy (uncomment jika ingin menggunakan)
+  # nginx-proxy:
+  #   image: nginx:alpine
+  #   container_name: nginx-proxy
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx-proxy.conf:/etc/nginx/conf.d/default.conf
+  #     - ./ssl-certs:/etc/nginx/ssl:ro
+  #   depends_on:
+  #     - qiraati-webapp
+  #   restart: unless-stopped
+  #   networks:
+  #     - qiraati-network
 
 networks:
   qiraati-network:
     driver: bridge
+
+# Volumes untuk data persistence (jika diperlukan)
+# volumes:
+#   qiraati-data:
+#     driver: local 

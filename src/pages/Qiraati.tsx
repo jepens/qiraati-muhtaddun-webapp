@@ -1,142 +1,171 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
-import { useToast } from '@/hooks/use-toast';
-import { Search, Mic, MicOff, BookOpen } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { BookOpen, Search, Mic, X, Check } from "lucide-react";
 import { useSurahList } from '@/hooks/useQuran';
+import { useToast } from "@/hooks/use-toast";
+// import { useVoiceControl } from '@/hooks/useVoiceControl'; // REMOVED
+import { useSpeechToText } from '@/hooks/useSpeechToText'; // NEW HOOK
+import { useFuseSearch } from '@/hooks/useFuseSearch';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
-// Helper functions for search normalization
-const numberWords: { [key: string]: string } = {
-  'satu': '1', 'dua': '2', 'tiga': '3', 'empat': '4', 'lima': '5',
-  'enam': '6', 'tujuh': '7', 'delapan': '8', 'sembilan': '9', 'sepuluh': '10'
-};
+const PREFIX_REGEX = /^(surat|surah|baca|buka|cari)(\s+|$)/i;
 
-function normalizeString(str: string) {
-  return str.toLowerCase().replace(/[-\s]/g, '');
-}
-
-function removePrefixes(str: string) {
-  let result = str.trim().toLowerCase();
-  const prefixes = [
-    'surat', 'surah',
-    'al', 'an', 'ar', 'as', 'ash', 'at', 'az', 'ad', 'al-', 'an-', 'ar-', 'as-', 'ash-', 'at-', 'az-', 'ad-'
-  ];
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const prefix of prefixes) {
-      const regex = new RegExp('^' + prefix + '[\\s-]*', 'i');
-      if (regex.test(result)) {
-        result = result.replace(regex, '');
-        changed = true;
-      }
-    }
-  }
-  return result.trim();
-}
-
-const validSurahNames = [
-  'al-fatihah', 'al-baqarah', 'al-i\'imran', 'an-nisa', 'al-ma\'idah', 'al-an\'am', 'al-a\'raf', 'al-anfal', 'at-taubah',
-  'yunus', 'hud', 'yusuf', 'ar-ra\'d', 'ibrahim', 'al-hijr', 'an-nahl', 'al-isra', 'al-kahf', 'maryam', 'ta ha',
-  'al-anbiya', 'al-hajj', 'al-mu\'minun', 'an-nur', 'al-furqan', 'ash-shu\'ara', 'an-naml', 'al-qasas', 'al-ankabut',
-  'ar-rum', 'luqman', 'as-sajdah', 'al-ahzab', 'saba', 'fatir', 'ya sin', 'as-saffat', 'sad', 'az-zumar', 'ghafir',
-  'fussilat', 'ash-shura', 'az-zukhruf', 'ad-dukhan', 'al-jathiyah', 'al-ahqaf', 'muhammad', 'al-fath', 'al-hujurat',
-  'qaf', 'ad-dhariyat', 'at-tur', 'an-najm', 'al-qamar', 'ar-rahman', 'al-waqi\'ah', 'al-hadid', 'al-mujadilah',
-  'al-hashr', 'al-mumtahanah', 'as-saff', 'al-jumu\'ah', 'al-munafiqun', 'at-taghabun', 'at-talaq', 'at-tahrim',
-  'al-mulk', 'al-qalam', 'al-haqqah', 'al-ma\'arij', 'nuh', 'al-jinn', 'al-muzzammil', 'al-muddathir', 'al-qiyamah',
-  'al-insan', 'al-mursalat', 'an-naba', 'an-nazi\'at', 'abasa', 'at-takwir', 'al-infitar', 'al-mutaffifin',
-  'al-inshiqaq', 'al-buruj', 'at-tariq', 'al-a\'la', 'al-ghashiyah', 'al-fajr', 'al-balad', 'ash-shams', 'al-layl',
-  'ad-duha', 'ash-sharh', 'at-tin', 'al-\'alaq', 'al-qadr', 'al-bayyinah', 'az-zalzalah', 'al-\'adiyat', 'al-qari\'ah',
-  'at-takathur', 'al-\'asr', 'al-humazah', 'al-fil', 'quraysh', 'al-ma\'un', 'al-kawthar', 'al-kafirun', 'an-nasr',
-  'al-masad', 'al-ikhlas', 'al-falaq', 'an-nas'
-];
-
-function isValidSurahName(str: string) {
-  return validSurahNames.includes(str.toLowerCase());
-}
-
-function performRobustSearch(query: string, surahs: any[]) {
-  if (!query.trim()) return surahs;
-
-  // Pre-process query
-  let processedQuery = query.toLowerCase();
-  Object.keys(numberWords).forEach(word => {
-    processedQuery = processedQuery.replace(new RegExp(word, 'g'), numberWords[word]);
-  });
-
-  let cleanQuery = processedQuery
-    .replace(/\s+/g, ' ')
-    .replace(/[^\w\s-]/g, '')
+function removePrefixes(str: string): string {
+  return str.toLowerCase()
+    .replace(PREFIX_REGEX, '')
     .trim();
-
-  cleanQuery = removePrefixes(cleanQuery);
-  const normalizedCleanQuery = normalizeString(cleanQuery);
-
-  // 1. Exact/High-Confidence Match
-  let results = surahs.filter(surah => {
-    let namaLatinCleaned = surah.namaLatin.toLowerCase();
-    let namaCleaned = surah.nama.toLowerCase();
-    let artiCleaned = surah.arti.toLowerCase();
-
-    if (!isValidSurahName(namaLatinCleaned)) namaLatinCleaned = removePrefixes(surah.namaLatin);
-    if (!isValidSurahName(namaCleaned)) namaCleaned = removePrefixes(surah.nama);
-    if (!isValidSurahName(artiCleaned)) artiCleaned = removePrefixes(surah.arti);
-
-    const namaLatinNorm = normalizeString(namaLatinCleaned);
-    const namaNorm = normalizeString(namaCleaned);
-    const artiNorm = normalizeString(artiCleaned);
-    const nomor = surah.nomor.toString();
-
-    return (
-      namaLatinNorm === normalizedCleanQuery ||
-      namaNorm === normalizedCleanQuery ||
-      artiNorm === normalizedCleanQuery ||
-      nomor === cleanQuery
-    );
-  });
-
-  // 2. Partial Match fallback
-  if (results.length === 0 && normalizedCleanQuery.length > 2) {
-    results = surahs.filter(surah => {
-      let namaLatinCleaned = surah.namaLatin.toLowerCase();
-      let namaCleaned = surah.nama.toLowerCase();
-      let artiCleaned = surah.arti.toLowerCase();
-
-      if (!isValidSurahName(namaLatinCleaned)) namaLatinCleaned = removePrefixes(surah.namaLatin);
-      if (!isValidSurahName(namaCleaned)) namaCleaned = removePrefixes(surah.nama);
-      if (!isValidSurahName(artiCleaned)) artiCleaned = removePrefixes(surah.arti);
-
-      const namaLatinNorm = normalizeString(namaLatinCleaned);
-      const namaNorm = normalizeString(namaCleaned);
-      const artiNorm = normalizeString(artiCleaned);
-
-      return (
-        namaLatinNorm.includes(normalizedCleanQuery) ||
-        namaNorm.includes(normalizedCleanQuery) ||
-        artiNorm.includes(normalizedCleanQuery)
-      );
-    });
-  }
-
-  return results;
 }
 
 const Qiraati: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isDataReady, setIsDataReady] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { surahs: allSurahs, loading: surahLoading } = useSurahList();
+
+  // Fuse Search Integration
+  const { search: fuseSearch } = useFuseSearch(allSurahs, {
+    keys: [
+      { name: 'nomor', weight: 1 },
+      { name: 'namaLatin', weight: 0.7 },
+      { name: 'nama', weight: 0.5 },
+      { name: 'arti', weight: 0.4 }
+    ],
+    threshold: 0.3,
+    ignoreDiacritics: true,
+  });
+
+  // New Voice Control Integration
+  const {
+    isListening,
+    transcript,
+    fullTranscript, // Combined transcript for display
+    startListening,
+    stopListening,
+    resetTranscript
+  } = useSpeechToText({
+    continuous: true,
+    lang: 'id-ID'
+  });
+
+  /* Start of Handlers */
+  const handleSearchResults = useCallback((results: any[], query: string, showToast = false) => {
+    if (results.length > 0) {
+      setSearchResults(results);
+      if (showToast) {
+        toast({
+          title: "Hasil Ditemukan",
+          description: `Ditemukan ${results.length} surat yang sesuai dengan "${query}"`,
+        });
+      }
+    } else {
+      setSearchResults([]);
+      if (showToast) {
+        toast({
+          variant: "destructive",
+          title: "Tidak Ditemukan",
+          description: `Tidak ada surat yang ditemukan untuk "${query}".`,
+        });
+      }
+    }
+  }, [toast]);
+
+  const handleTextSearch = useCallback((query: string, showToast = false) => {
+    const cleanQuery = removePrefixes(query);
+    const results = fuseSearch(cleanQuery);
+    handleSearchResults(results, query, showToast);
+    return results;
+  }, [fuseSearch, handleSearchResults]);
+
+  // Execute Voice Command (Navigation or Search)
+  const executeVoiceCommand = useCallback((text: string) => {
+    console.log("Executing Voice Command:", text);
+    const lowerText = text.toLowerCase();
+
+    // Check for Ayat navigation: "Surat Yasin Ayat 5" or "Buka Yasin Ayat 5"
+    const ayatMatch = lowerText.match(/(?:surat|surah)?\s*(.+?)\s+ayat\s+(\d+)/);
+
+    if (ayatMatch) {
+      const surahName = ayatMatch[1];
+      const ayatNum = ayatMatch[2];
+      const cleanName = removePrefixes(surahName);
+      const results = fuseSearch(cleanName);
+
+      if (results.length > 0) {
+        setIsVoiceModalOpen(false);
+        const targetSurah = results[0];
+        navigate(`/qiraati/surat/${targetSurah.nomor}#ayat-${ayatNum}`, {
+          state: { autoPlayAyat: parseInt(ayatNum) }
+        });
+        toast({ title: "Membuka Surat", description: `${targetSurah.namaLatin} Ayat ${ayatNum}` });
+        return;
+      }
+    }
+
+    // Default: Search for Surah
+    const results = handleTextSearch(text, true); // Search and show toast
+
+    // If exactly one highly relevant result, maybe auto-open?
+    // For now, let's just show results in the list (already done by handleTextSearch)
+    // But if we are in Modal, we might want to close it?
+    // Let's close modal if we found something
+    if (results.length > 0) {
+      // If we found an exact match or close match, and it looks like a navigation intent
+      if (text.includes('buka') || text.includes('baca')) {
+        setIsVoiceModalOpen(false);
+        navigate(`/qiraati/surat/${results[0].nomor}`);
+        toast({ title: "Membuka Surat", description: `${results[0].namaLatin}` });
+      } else {
+        // Just filtering the list
+        setIsVoiceModalOpen(false);
+        setSearchQuery(text); // Update search box
+      }
+    }
+
+  }, [fuseSearch, handleTextSearch, navigate, toast]);
+
+  // Debounce Logic for Voice
+  useEffect(() => {
+    if (!isVoiceModalOpen || !transcript) return;
+
+    // Debounce: Wait 1.5s after last FINAL transcript update
+    const timer = setTimeout(() => {
+      if (transcript.trim().length > 0) {
+        executeVoiceCommand(transcript);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [transcript, isVoiceModalOpen, executeVoiceCommand]);
+
+  // Start listening when modal opens
+  useEffect(() => {
+    if (isVoiceModalOpen) {
+      startListening();
+    } else {
+      stopListening();
+      resetTranscript();
+    }
+  }, [isVoiceModalOpen, startListening, stopListening, resetTranscript]);
+
+  /* End of Handlers */
 
   // Update search results when surahs change
   React.useEffect(() => {
@@ -153,32 +182,17 @@ const Qiraati: React.FC = () => {
     setLoading(surahLoading);
   }, [surahLoading]);
 
-  // Refs for callbacks to access latest state without triggering re-renders
-  const transcriptRef = useRef(transcript);
-  const allSurahsRef = useRef(allSurahs);
-
-  // Update refs when state changes
-  React.useEffect(() => {
-    transcriptRef.current = transcript;
-  }, [transcript]);
-
-  React.useEffect(() => {
-    allSurahsRef.current = allSurahs;
-  }, [allSurahs]);
-
-  // Handle URL query parameters for voice commands from SurahDetail
+  // Handle URL query parameters
   React.useEffect(() => {
     if (allSurahs.length === 0) return;
-
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const voiceSearch = params.get('voice_search');
     const ayat = params.get('ayat');
 
     if (voiceSearch) {
       const decodedSearch = decodeURIComponent(voiceSearch);
-
-      // Use the shared robust search logic
-      const results = performRobustSearch(decodedSearch, allSurahs);
+      const clean = removePrefixes(decodedSearch);
+      const results = fuseSearch(clean);
 
       if (results.length > 0) {
         const targetSurah = results[0];
@@ -187,7 +201,9 @@ const Qiraati: React.FC = () => {
           description: `Membuka ${targetSurah.namaLatin}${ayat ? ` ayat ${ayat}` : ''}...`
         });
 
+        // Small delay to allow toast to be seen
         setTimeout(() => {
+          // Clear query params to prevent re-triggering on refresh
           window.history.replaceState({}, '', '/qiraati');
           navigate(`/qiraati/surat/${targetSurah.nomor}${ayat ? `#ayat-${ayat}` : ''}`, {
             state: { autoPlayAyat: ayat ? parseInt(ayat) : undefined }
@@ -201,199 +217,12 @@ const Qiraati: React.FC = () => {
         });
       }
     }
-  }, [allSurahs, navigate, toast]);
+  }, [allSurahs, location.search, fuseSearch, navigate, toast]);
 
-  // Initialize Speech Recognition
-  React.useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-
-      if (recognitionRef.current) {
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = 'id-ID'; // Indonesian language
-        recognitionRef.current.maxAlternatives = 3; // Get multiple alternatives
-
-        recognitionRef.current.onstart = () => {
-          setIsListening(true);
-          toast({
-            title: "Mendengarkan...",
-            description: "Silakan ucapkan nama atau nomor surat yang ingin dibaca",
-          });
-        };
-
-
-        recognitionRef.current.onresult = (event: any) => {
-          let finalTranscript = '';
-          let interimTranscript = '';
-
-          // Process all results to get the best match
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              finalTranscript += transcript;
-            } else {
-              interimTranscript += transcript;
-            }
-          }
-
-          // If we have a final result, use it
-          if (finalTranscript) {
-            setTranscript(finalTranscript);
-            setSearchQuery(finalTranscript);
-            // Check if surahs are loaded before searching
-            if (allSurahsRef.current.length > 0) {
-              handleVoiceSearch(finalTranscript);
-            } else {
-              toast({
-                title: "Loading...",
-                description: "Sedang memuat data surat, silakan coba lagi dalam beberapa detik.",
-              });
-            }
-          }
-          // Show interim results while still processing
-          else if (interimTranscript) {
-            setTranscript(interimTranscript);
-            setSearchQuery(interimTranscript);
-          }
-        };
-
-
-        recognitionRef.current.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
-          setIsListening(false);
-
-          let errorMessage = "Maaf, suara tidak dikenali. ";
-          switch (event.error) {
-            case 'network':
-              errorMessage += "Periksa koneksi internet Anda.";
-              break;
-            case 'not-allowed':
-            case 'permission-denied':
-              errorMessage += "Izinkan akses mikrofon untuk menggunakan fitur ini.";
-              break;
-            case 'no-speech':
-              errorMessage += "Tidak ada suara yang terdeteksi. Mohon coba lagi.";
-              break;
-            default:
-              errorMessage += "Mohon coba lagi dengan lebih jelas atau gunakan pencarian teks.";
-          }
-
-          toast({
-            title: "Error",
-            description: errorMessage,
-            variant: "destructive",
-          });
-        };
-
-        recognitionRef.current.onend = () => {
-          setIsListening(false);
-          // If no final result was received, show a message
-          if (!transcriptRef.current) {
-            toast({
-              title: "Info",
-              description: "Pencarian suara selesai. Jika hasil tidak sesuai, coba ucapkan dengan lebih jelas.",
-            });
-          }
-        };
-      }
-    } else {
-      toast({
-        title: "Peringatan",
-        description: "Browser Anda tidak mendukung fitur pencarian suara. Silakan gunakan pencarian teks.",
-        variant: "destructive",
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Initialize once
-
-  const startVoiceRecognition = () => {
-    if (recognitionRef.current && !isListening) {
-      try {
-        recognitionRef.current.start();
-      } catch (error) {
-        console.error('Error starting speech recognition:', error);
-        toast({
-          title: "Error",
-          description: "Tidak dapat memulai pencarian suara. Silakan coba lagi.",
-          variant: "destructive",
-        });
-      }
-    }
-  };
-
-  const stopVoiceRecognition = () => {
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
-    }
-  };
-
-  const handleVoiceSearch = (query: string) => {
-    const results = performRobustSearch(query, allSurahs);
-    handleSearchResults(results, query);
-  };
-
-  const handleTextSearch = (query: string) => {
-    const results = performRobustSearch(query, allSurahs);
-    setSearchResults(results);
-  };
-
-  const handleSearchResults = (results: any[], query: string) => {
-    if (results.length > 0) {
-      setSearchResults(results);
-      toast({
-        title: "Hasil Ditemukan",
-        description: `Ditemukan ${results.length} surat yang sesuai dengan "${query}"`,
-      });
-    } else {
-      setSearchResults([]);
-
-      // Fallback: Suggest similar surah names
-      function simpleSimilarity(a: string, b: string) {
-        let max = 0;
-        for (let i = 0; i < a.length; i++) {
-          for (let j = i + 1; j <= a.length; j++) {
-            const sub = a.slice(i, j);
-            if (b.includes(sub) && sub.length > max) max = sub.length;
-          }
-        }
-        return max;
-      }
-
-      // Normalize query for suggestion check
-      // We need to re-normalize here since we don't have access to the clean query from performRobustSearch
-      // unless we change signature, but re-doing it is fine for this fallback
-      let cleanQuery = query.toLowerCase().replace(/[^\w\s]/g, '');
-      cleanQuery = removePrefixes(cleanQuery);
-      const normalizedQuery = normalizeString(cleanQuery);
-
-      const suggestions = allSurahs
-        .map(surah => {
-          let namaLatinCleaned = surah.namaLatin.toLowerCase();
-          if (!isValidSurahName(namaLatinCleaned)) {
-            namaLatinCleaned = removePrefixes(surah.namaLatin);
-          }
-          const namaLatinNorm = normalizeString(namaLatinCleaned);
-          const score = simpleSimilarity(namaLatinNorm, normalizedQuery);
-          return { surah, score };
-        })
-        .filter(item => item.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3)
-        .map(item => item.surah.namaLatin);
-
-      const suggestionText = suggestions.length > 0
-        ? `Coba: ${suggestions.join(', ')}`
-        : 'Coba kata kunci lain seperti: Al-Fatihah, Yasin, Al-Baqarah, Al-Kafirun';
-
-      toast({
-        variant: "destructive",
-        title: "Tidak Ditemukan",
-        description: `Tidak ada surat yang ditemukan untuk "${query}". ${suggestionText}`,
-      });
-    }
+  const startVoiceSearch = () => {
+    if (!isDataReady) return;
+    setIsVoiceModalOpen(true);
+    setSearchQuery('');
   };
 
   const handleSurahClick = (surahId: number) => {
@@ -427,34 +256,61 @@ const Qiraati: React.FC = () => {
                 />
               </div>
               <Button
-                variant={isListening ? "destructive" : "secondary"}
-                onClick={isListening ? stopVoiceRecognition : startVoiceRecognition}
+                variant="secondary"
+                onClick={startVoiceSearch}
                 className="flex items-center gap-2"
                 disabled={!isDataReady}
               >
-                {isListening ? (
-                  <>
-                    <MicOff className="w-4 h-4" />
-                    <span className="hidden sm:inline">Berhenti</span>
-                  </>
-                ) : (
-                  <>
-                    <Mic className="w-4 h-4" />
-                    <span className="hidden sm:inline">
-                      {isDataReady ? "Cari dengan Suara" : "Loading..."}
-                    </span>
-                  </>
-                )}
+                <Mic className="w-4 h-4" />
+                <span className="hidden sm:inline">
+                  {isDataReady ? "Cari dengan Suara" : "Loading..."}
+                </span>
               </Button>
             </div>
-            {/* Debug: Show transcript */}
-            {transcript && (
-              <div className="mt-4 p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Transcript:</p>
-                <p className="text-sm font-mono">{transcript}</p>
-              </div>
-            )}
-            {/* Data readiness indicator */}
+
+            {/* Voice Search Modal */}
+            <Dialog open={isVoiceModalOpen} onOpenChange={setIsVoiceModalOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-center flex flex-col items-center gap-4">
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center ${isListening ? 'bg-red-100 animate-pulse' : 'bg-gray-100'}`}>
+                      <Mic className={`w-8 h-8 ${isListening ? 'text-red-500' : 'text-gray-400'}`} />
+                    </div>
+                    {isListening ? "Mendengarkan..." : "Memproses..."}
+                  </DialogTitle>
+                  <DialogDescription className="text-center">
+                    Katakan nama surat. Jeda sejenak untuk mencari otomatis.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="py-6 space-y-4">
+                  <div className="bg-muted p-4 rounded-lg min-h-[80px] flex items-center justify-center text-center">
+                    <p className="text-lg font-medium text-foreground">
+                      {fullTranscript || "..."}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 justify-center text-xs text-muted-foreground">
+                    <span className="bg-secondary px-2 py-1 rounded-md">"Al-Mulk"</span>
+                    <span className="bg-secondary px-2 py-1 rounded-md">"Surat Yasin"</span>
+                    <span className="bg-secondary px-2 py-1 rounded-md">"Buka Ayat 5"</span>
+                  </div>
+                </div>
+
+                <DialogFooter className="sm:justify-between gap-2">
+                  <Button variant="ghost" onClick={() => setIsVoiceModalOpen(false)}>
+                    <X className="w-4 h-4 mr-2" /> Batal
+                  </Button>
+                  <Button
+                    onClick={() => executeVoiceCommand(fullTranscript)}
+                    disabled={!fullTranscript.trim()}
+                  >
+                    <Check className="w-4 h-4 mr-2" /> Cari Sekarang
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             {!isDataReady && (
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <p className="text-sm text-yellow-800">

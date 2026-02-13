@@ -46,6 +46,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    const signInWithGoogle = async () => {
+        try {
+            setError(null);
+            const { error: signInError } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent',
+                    },
+                    redirectTo: `${window.location.origin}/`,
+                },
+            });
+            if (signInError) throw signInError;
+        } catch (err: any) {
+            console.error('Error signing in with Google:', err);
+            setError(err.message || 'Failed to sign in with Google');
+            throw err;
+        }
+    };
+
     const signOut = async () => {
         try {
             setError(null);
@@ -63,6 +84,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isLoading,
         error,
         signIn,
+        signInWithGoogle,
         signOut,
         isAuthenticated: !!user,
     };

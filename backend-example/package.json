@@ -18,8 +18,9 @@
   "author": "Masjid Al-Muhtaddun",
   "license": "MIT",
   "dependencies": {
-    "express": "^4.18.2",
     "cors": "^2.8.5",
+    "equran": "^1.0.0",
+    "express": "^4.18.2",
     "node-fetch": "^2.6.7"
   },
   "devDependencies": {

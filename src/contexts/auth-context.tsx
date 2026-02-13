@@ -6,6 +6,7 @@ export interface AuthContextType {
     isLoading: boolean;
     error: string | null;
     signIn: (email: string, password: string) => Promise<void>;
+    signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
     isAuthenticated: boolean;
 }

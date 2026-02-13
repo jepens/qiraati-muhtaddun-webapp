@@ -16,9 +16,11 @@ COPY . .
 # Set environment variables untuk build (bisa di-override via build args)
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_GEMINI_API_KEY
 
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
 ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_GEMINI_API_KEY=$VITE_GEMINI_API_KEY
 
 # Build aplikasi untuk production
 RUN npm run build

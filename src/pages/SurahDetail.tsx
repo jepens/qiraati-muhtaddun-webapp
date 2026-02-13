@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Play, Pause, Volume2, VolumeX, Plus, Minus, ScrollText, FastForward, ScanFace } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -96,7 +96,7 @@ const SurahDetail: React.FC = () => {
 
 
 
-  const playFullSurah = () => {
+  const playFullSurah = useCallback(() => {
     if (!surahData?.audioFull?.['01']) return;
 
     if (audioRef.current) {
@@ -117,7 +117,7 @@ const SurahDetail: React.FC = () => {
         });
       }
     }
-  };
+  }, [surahData, isPlayingFull]);
 
   const playAyat = React.useCallback((ayatNumber: number) => {
     if (!surahData) return;
@@ -188,7 +188,7 @@ const SurahDetail: React.FC = () => {
     }
   }, [loading, surahData, location.state, playAyat]);
 
-  const stopAllAudio = () => {
+  const stopAllAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       setIsPlayingFull(false);
@@ -199,14 +199,14 @@ const SurahDetail: React.FC = () => {
       audio.currentTime = 0; // Reset time so it starts from beginning next time
     });
     setAutoScroll(false);
-  };
+  }, [setIsPlayingFull, setPlayingAyat, setAutoScroll]);
 
   // Cleanup audio on unmount
   useEffect(() => {
     return () => {
       stopAllAudio();
     };
-  }, []);
+  }, [stopAllAudio]);
 
   // Smart Reader Hooks integration
   const { videoRef, isReady: isFaceReady, error: faceError, debugRefs } = useFaceScroll({
@@ -220,7 +220,7 @@ const SurahDetail: React.FC = () => {
 
   const { isListening, isProcessing, error: voiceError } = useVoiceControl({
     enabled: isSmartMode,
-    onCommand: (command, args) => {
+    onCommand: useCallback((command, args) => {
       switch (command) {
         case 'play':
           playFullSurah();
@@ -239,22 +239,7 @@ const SurahDetail: React.FC = () => {
         case 'open_surah_ayat':
           if (args?.surah) {
             stopAllAudio(); // Stop audio before navigating
-            // Logic to find surah ID from name (similar to Qiraati search)
-            // This requires access to all Surahs list or a helper. 
-            // For now, we'll implement a basic search or fetch if not available.
-            // Ideally, we move the search logic to a hook or utility.
-            // IMPORTANT: For this to work robustly, we need the Surah list.
-            // As a fallback/quick-fix, we can redirect to search page with query, 
-            // OR we can implement the search logic here if we have the data.
-            // Given we are inside SurahDetail, we only have single Surah data.
-            // Let's navigation to home with search query as simplest robust step 
-            // OR assuming we can get the ID via a quick fetch/lookup.
-
-            // BETTER APPROACH: Let's assume user wants to go to that surah.
-            // We can try to navigate to /qiraati/surat/[id] if we can match the name.
-            // Since we don't have the list here, let's navigate to Qiraati with a state/search param
             navigate(`/qiraati?voice_search=${encodeURIComponent(args.surah)}&ayat=${args.ayat || ''}`);
-            // Note: isProcessing will be true for 2s in hook, providing feedback before nav completes
           }
           break;
         case 'pause':
@@ -265,7 +250,7 @@ const SurahDetail: React.FC = () => {
           setAutoScroll(true);
           break;
       }
-    }
+    }, [playFullSurah, playAyat, stopAllAudio, navigate, setAutoScroll])
   });
 
   const handleFontSizeChange = (newSize: typeof fontSize) => {
