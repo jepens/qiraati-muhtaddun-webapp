@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVoice } from '@/hooks/useVoice';
 import { useVectorSearch, VectorSearchResult } from '@/hooks/useVectorSearch';
 import { useFuseSearch } from '@/hooks/useFuseSearch';
+import { parseVoiceCommand, removePrefixes } from '@/utils/voiceCommandUtils';
 import type { Surat } from '@/types/quran';
 import {
   Dialog,
@@ -20,13 +21,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-const PREFIX_REGEX = /^(surat|surah|baca|buka|cari)(\s+|$)/i;
-
-function removePrefixes(str: string): string {
-  return str.toLowerCase()
-    .replace(PREFIX_REGEX, '')
-    .trim();
-}
 
 type FilterType = 'semua' | 'makkiyah' | 'madaniyah';
 
@@ -106,26 +100,11 @@ const Qiraati: React.FC = () => {
     setFilteredSurahs(applyFilter(results, filter));
   }, [searchQuery, fuseSearch, allSurahs, applyFilter]);
 
-  // Voice command execution (async — uses Vector Search API)
+  // Voice command execution (async — uses shared parser + Vector Search API)
   const executeVoiceCommand = useCallback(async (text: string) => {
-    const lowerText = text.toLowerCase();
-
-    // ── Guard: detect multiple surahs in surah mode ──
-    if (voiceSearchMode === 'surah') {
-      const multiPattern = /\b(dan|atau|sama)\b/i;
-      if (multiPattern.test(lowerText.replace(PREFIX_REGEX, '').trim())) {
-        toast({
-          variant: 'destructive',
-          title: 'Satu Surat Saja',
-          description: 'Silakan sebutkan satu nama surat saja. Contoh: "Surat Yasin" atau "Al-Mulk".',
-        });
-        return;
-      }
-    }
-
     // ── Ayat search mode: semantic search via Vector API ──
     if (voiceSearchMode === 'ayat') {
-      const cleanQuery = lowerText.replace(/(?:cari\s+)?(?:ayat\s+)?(?:tentang\s+)?/, '').trim();
+      const cleanQuery = text.toLowerCase().replace(/(?:cari\s+)?(?:ayat\s+)?(?:tentang\s+)?/, '').trim();
       if (!cleanQuery) return;
       setIsVectorLoading(true);
       try {
@@ -141,62 +120,63 @@ const Qiraati: React.FC = () => {
       return;
     }
 
-    // ── Content search detection (surah mode fallback) ──
-    const contentMatch = lowerText.match(/(?:cari\s+)?(?:ayat\s+)?tentang\s+(.+)/);
-    if (contentMatch) {
-      const query = contentMatch[1].trim();
-      setIsVectorLoading(true);
-      try {
-        const results = await vectorSearch(query, { tipe: ['ayat'], batas: 10, skorMin: 0.3 });
-        if (results.length > 0) {
-          setAyatResults(results);
-          toast({ title: '🔍 AI Vector Search', description: `${results.length} ayat ditemukan untuk "${query}".` });
-        } else {
-          toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Tidak ditemukan ayat tentang "${query}".` });
-        }
-      } catch { /* handled by hook */ }
-      setIsVectorLoading(false);
-      return;
-    }
+    // ── Surah mode: use shared parser ──
+    const result = parseVoiceCommand(text, fuseSearch);
 
-    // ── Surah + Ayat navigation ──
-    const ayatMatch = lowerText.match(/(?:surat|surah)?\s*(.+?)\s+ayat\s+(\d+)/);
-    if (ayatMatch) {
-      const surahName = ayatMatch[1];
-      const ayatNum = ayatMatch[2];
-      const cleanName = removePrefixes(surahName);
-      const results = fuseSearch(cleanName);
-      if (results.length > 0) {
-        setIsVoiceModalOpen(false);
-        const targetSurah = results[0];
-        navigate(`/qiraati/surat/${targetSurah.nomor}#ayat-${ayatNum}`, {
-          state: { autoPlayAyat: parseInt(ayatNum) }
+    switch (result.type) {
+      case 'multi_surah_rejected':
+        toast({
+          variant: 'destructive',
+          title: 'Satu Surat Saja',
+          description: 'Silakan sebutkan satu nama surat saja. Contoh: "Surat Yasin" atau "Al-Mulk".',
         });
-        toast({ title: "Membuka Surat", description: `${targetSurah.namaLatin} Ayat ${ayatNum}` });
+        return;
+
+      case 'surah_navigate':
+        setIsVoiceModalOpen(false);
+        navigate(`/qiraati/surat/${result.surahNomor}`);
+        toast({ title: 'Membuka Surat', description: result.surahNamaLatin });
+        return;
+
+      case 'surah_ayat_navigate':
+        setIsVoiceModalOpen(false);
+        navigate(`/qiraati/surat/${result.surahNomor}#ayat-${result.ayatNumber}`, {
+          state: { autoPlayAyat: result.ayatNumber }
+        });
+        toast({ title: 'Membuka Surat', description: `${result.surahNamaLatin} Ayat ${result.ayatNumber}` });
+        return;
+
+      case 'content_search':
+        // Trigger Vector Search for content queries
+        setIsVectorLoading(true);
+        try {
+          const results = await vectorSearch(result.searchQuery, { tipe: ['ayat'], batas: 10, skorMin: 0.3 });
+          if (results.length > 0) {
+            setAyatResults(results);
+            toast({ title: '🔍 AI Vector Search', description: `${results.length} ayat ditemukan untuk "${result.searchQuery}".` });
+          } else {
+            toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Tidak ditemukan ayat tentang "${result.searchQuery}".` });
+          }
+        } catch { /* handled by hook */ }
+        setIsVectorLoading(false);
+        return;
+
+      case 'not_found': {
+        // Fallback: try Vector API semantic search
+        const cleanQuery = removePrefixes(text);
+        setIsVectorLoading(true);
+        try {
+          const vectorResults = await vectorSearch(cleanQuery, { batas: 5, skorMin: 0.3 });
+          if (vectorResults.length > 0) {
+            setAyatResults(vectorResults);
+            toast({ title: '🔍 AI Vector Search', description: `${vectorResults.length} hasil ditemukan.` });
+          } else {
+            toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Tidak ada hasil untuk "${text}".` });
+          }
+        } catch { /* handled by hook */ }
+        setIsVectorLoading(false);
         return;
       }
-    }
-
-    // ── Surah name search (Fuse.js for names) → always auto-navigate ──
-    const cleanQuery = removePrefixes(text);
-    const results = fuseSearch(cleanQuery);
-    if (results.length > 0) {
-      setIsVoiceModalOpen(false);
-      navigate(`/qiraati/surat/${results[0].nomor}`);
-      toast({ title: "Membuka Surat", description: results[0].namaLatin });
-    } else {
-      // Fallback: try Vector API semantic search
-      setIsVectorLoading(true);
-      try {
-        const vectorResults = await vectorSearch(cleanQuery, { batas: 5, skorMin: 0.3 });
-        if (vectorResults.length > 0) {
-          setAyatResults(vectorResults);
-          toast({ title: '🔍 AI Vector Search', description: `${vectorResults.length} hasil ditemukan.` });
-        } else {
-          toast({ variant: "destructive", title: "Tidak Ditemukan", description: `Tidak ada hasil untuk "${text}".` });
-        }
-      } catch { /* handled by hook */ }
-      setIsVectorLoading(false);
     }
   }, [fuseSearch, navigate, toast, vectorSearch, voiceSearchMode]);
 

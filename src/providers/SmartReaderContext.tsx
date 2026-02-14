@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
-import { SmartReaderContext } from './SmartReaderContextDefinition';
+import { SmartReaderContext, type GestureType } from './SmartReaderContextDefinition';
 
 export const SmartReaderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isSmartMode, setIsSmartMode] = useState(false);
-
-    // Optional: Persist to localStorage if desired, but user didn't explicitly ask for persistent session storage, only nav.
-    // We'll keep it simple for now, as context survives nav. 
-    // If refresh happens, it resets. If user wants restart persistence, we can add localStorage later.
+    const [gestureType, setGestureType] = useState<GestureType>('head');
 
     return (
-        <SmartReaderContext.Provider value={{ isSmartMode, setIsSmartMode }}>
+        <SmartReaderContext.Provider value={{ isSmartMode, setIsSmartMode, gestureType, setGestureType }}>
             {children}
         </SmartReaderContext.Provider>
     );
 };
-
-

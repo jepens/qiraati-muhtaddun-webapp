@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  ArrowLeft, Play, Pause, Plus, Minus,
-  ScrollText, FastForward, ScanFace, Bookmark, BookmarkCheck,
+  ArrowLeft, Play, Pause, Plus, Minus, X,
+  ScrollText, FastForward, ScanFace, Hand, Bookmark, BookmarkCheck,
   BookOpenText, Copy, Share2, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -33,9 +33,13 @@ import {
 import { useBookmarks } from '@/hooks/useBookmarks';
 import { useLastRead } from '@/hooks/useLastRead';
 import { useFaceScroll } from '@/hooks/useFaceScroll';
+import { useHandGesture } from '@/hooks/useHandGesture';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 import SmartReaderOverlay from '@/components/SmartReaderOverlay';
-import SearchWidget from '@/components/SearchWidget';
+import { HandPointer } from '@/components/HandPointer';
+import SmartModeOnboarding from '@/components/SmartModeOnboarding';
+import SearchWidget, { type SearchWidgetHandle } from '@/components/SearchWidget';
 import { useSmartReader } from '@/providers/SmartReaderHooks';
 import SurahSidebar from '@/components/SurahSidebar';
 import { useToast } from '@/hooks/use-toast';
@@ -75,7 +79,11 @@ const SurahDetail: React.FC = () => {
   const [selectedQari, setSelectedQari] = useState<string>('05'); // Default: Misyari Rasyid
   const [tafsirModalOpen, setTafsirModalOpen] = useState(false);
   const [tafsirModalAyat, setTafsirModalAyat] = useState<number | null>(null);
-  const { isSmartMode, setIsSmartMode } = useSmartReader();
+  const [smartOnboardingOpen, setSmartOnboardingOpen] = useState(false);
+  const [onboardingType, setOnboardingType] = useState<'head' | 'hand'>('head');
+  const { isSmartMode, setIsSmartMode, gestureType, setGestureType } = useSmartReader();
+  const isMobile = useIsMobile();
+  const searchWidgetRef = useRef<SearchWidgetHandle>(null);
 
   // Refs
   const ayatListRef = useRef<HTMLDivElement>(null);
@@ -313,31 +321,82 @@ const SurahDetail: React.FC = () => {
   }, []);
 
   // ─── Smart Reader ───
+
+  const isHandMode = gestureType === 'hand';
+  const isFaceMode = gestureType === 'head';
+
+  // ── Face scroll (mobile) ──
   const handleFaceScroll = useCallback((speed: number) => {
     if (ayatListRef.current) ayatListRef.current.scrollTop += speed;
   }, []);
 
   const { videoRef, isReady: isFaceReady, error: faceError, isFaceLost, isTooClose, headPosition, debugRefs } = useFaceScroll({
-    enabled: isSmartMode,
+    enabled: isSmartMode && isFaceMode,
     onScroll: handleFaceScroll,
   });
+
+  // ── Hand gesture (desktop) ──
+  const handleHandScroll = useCallback((delta: number) => {
+    if (ayatListRef.current) ayatListRef.current.scrollTop += delta;
+  }, []);
+
+  const handleGesture = useCallback((gesture: string) => {
+    switch (gesture) {
+      case 'Victory':
+        // Toggle search drawer — open with mic if closed, close if open
+        if (searchWidgetRef.current?.isOpen) {
+          searchWidgetRef.current.close();
+        } else {
+          searchWidgetRef.current?.openWithMic();
+        }
+        break;
+      case 'Thumb_Up':
+        // Toggle play full surah audio
+        playFullSurah();
+        break;
+    }
+  }, [playFullSurah]);
+
+  const {
+    videoRef: handVideoRef,
+    canvasRef: handCanvasRef,
+    isReady: isHandReady,
+    error: handError,
+    pointer: handPointer,
+    gesture: currentGesture,
+    isPinching,
+    isGrabbing,
+    isHandDetected,
+  } = useHandGesture({
+    enabled: isSmartMode && isHandMode,
+    onScroll: handleHandScroll,
+    onGesture: handleGesture,
+    containerRef: ayatListRef,
+  });
+
+  // Combined video ref — use the active one
+  const activeVideoRef = isHandMode ? handVideoRef : videoRef;
+  const activeReady = isHandMode ? isHandReady : isFaceReady;
+  const activeError = isHandMode ? handError : faceError;
 
 
 
 
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar (desktop only) */}
-      <SurahSidebar surahs={allSurahs} currentNomor={nomor} loading={surahsLoading} />
+    <div className={`flex ${isSmartMode ? '' : 'min-h-screen'}`}>
+      {/* Sidebar (desktop only) — hidden in Smart Mode */}
+      {!isSmartMode && <SurahSidebar surahs={allSurahs} currentNomor={nomor} loading={surahsLoading} />}
 
       {/* Main Content */}
       <div className="flex-1 min-w-0">
-        {/* Back button */}
-        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border/30 px-4 py-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/qiraati')}>
-            <ArrowLeft className="w-4 h-4 mr-2" /> Kembali ke Beranda
-          </Button>
-        </div>
+        {/* Back button — hidden in Smart Mode */}
+        {!isSmartMode && (
+          <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border/30 px-4 py-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/qiraati')}>
+              <ArrowLeft className="w-4 h-4 mr-2" /> Kembali ke Beranda
+            </Button>
+          </div>
+        )}
 
         {loading ? (
           <div className="p-6 space-y-6">
@@ -353,9 +412,9 @@ const SurahDetail: React.FC = () => {
             ))}
           </div>
         ) : surahData ? (
-          <div className="p-4 md:p-6 space-y-4">
-            {/* ── Surah Header ── */}
-            {(
+          <div className={isSmartMode ? '' : 'p-4 md:p-6 space-y-4'}>
+            {/* ── Surah Header — hidden in Smart Mode ── */}
+            {!isSmartMode && (
               <div className="rounded-xl border border-border/30 bg-card p-5 md:p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -380,49 +439,47 @@ const SurahDetail: React.FC = () => {
             )}
 
             {/* ── Controls Bar ── */}
-            {(
-              <div className="rounded-xl border border-border/30 bg-card px-4 py-3 flex flex-wrap items-center gap-3 md:gap-4 text-sm">
-                {/* Qari Selector */}
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground hidden sm:inline">Qari:</span>
-                  <Select value={selectedQari} onValueChange={(v) => { setSelectedQari(v); stopAllAudio(); }}>
-                    <SelectTrigger className="w-[180px] md:w-[220px] h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(qariMap).map(([qid, name]) => (
-                        <SelectItem key={qid} value={qid}>{name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="hidden md:block w-px h-6 bg-border/50" />
-
-                {/* Transliteration Toggle */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-muted-foreground text-xs">ꦲ Transliterasi</span>
-                  <Switch checked={showTransliteration} onCheckedChange={setShowTransliteration} />
-                </label>
-
-                {/* Translation Toggle */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-muted-foreground text-xs">T Terjemahan</span>
-                  <Switch checked={showTranslation} onCheckedChange={setShowTranslation} />
-                </label>
-
-                <div className="hidden md:block w-px h-6 bg-border/50" />
-
-                {/* Play Full */}
-                <Button variant="ghost" size="sm" onClick={playFullSurah} className="text-emerald-500 hover:text-emerald-400">
-                  {isPlayingFull ? <Pause className="w-4 h-4 mr-1" /> : <Play className="w-4 h-4 mr-1" />}
-                  Play Audio Full
-                </Button>
+            <div className={`rounded-xl border border-border/30 bg-card px-4 py-3 flex flex-wrap items-center justify-center gap-3 md:gap-4 text-sm ${isSmartMode ? 'sticky top-0 z-50 shadow-lg backdrop-blur-sm bg-card/95 mx-auto max-w-fit' : ''}`}>
+              {/* Qari Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground hidden sm:inline">Qari:</span>
+                <Select value={selectedQari} onValueChange={(v) => { setSelectedQari(v); stopAllAudio(); }}>
+                  <SelectTrigger className="w-[180px] md:w-[220px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(qariMap).map(([qid, name]) => (
+                      <SelectItem key={qid} value={qid}>{name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
 
-            {/* ── Font & Scroll Controls ── */}
-            {(
+              <div className="hidden md:block w-px h-6 bg-border/50" />
+
+              {/* Transliteration Toggle */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-muted-foreground text-xs">ꦲ Transliterasi</span>
+                <Switch checked={showTransliteration} onCheckedChange={setShowTransliteration} />
+              </label>
+
+              {/* Translation Toggle */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-muted-foreground text-xs">T Terjemahan</span>
+                <Switch checked={showTranslation} onCheckedChange={setShowTranslation} />
+              </label>
+
+              <div className="hidden md:block w-px h-6 bg-border/50" />
+
+              {/* Play Full */}
+              <Button variant="ghost" size="sm" onClick={playFullSurah} className="text-emerald-500 hover:text-emerald-400">
+                {isPlayingFull ? <Pause className="w-4 h-4 mr-1" /> : <Play className="w-4 h-4 mr-1" />}
+                Play Audio Full
+              </Button>
+            </div>
+
+            {/* ── Font & Scroll Controls — hidden in Smart Mode ── */}
+            {!isSmartMode && (
               <details className="rounded-xl border border-border/30 bg-card">
                 <summary className="px-4 py-3 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
                   ⚙ Pengaturan Tampilan & Scroll
@@ -482,8 +539,25 @@ const SurahDetail: React.FC = () => {
             {/* ── Ayat List ── */}
             <div
               ref={ayatListRef}
-              className="space-y-3 max-h-[calc(100vh-16rem)] overflow-y-auto scroll-smooth pb-20"
+              className={`space-y-3 overflow-y-auto scroll-smooth ${isSmartMode
+                ? 'h-dvh'
+                : 'max-h-[calc(100vh-16rem)] pb-20'
+                }`}
+              style={isSmartMode ? { paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' } : undefined}
             >
+              {/* ── Immersive Header (Smart Mode only, inside scroll container for sticky) ── */}
+              {isSmartMode && surahData && (
+                <div className="sticky top-0 z-10 flex items-center justify-between bg-background/90 backdrop-blur-md border-b border-border/20 px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full border-2 border-emerald-500 flex items-center justify-center">
+                      <span className="text-[10px] font-bold text-emerald-500">{surahData.nomor}</span>
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">{surahData.namaLatin}</span>
+                    <span className="text-xs text-muted-foreground">• {surahData.jumlahAyat} Ayat</span>
+                  </div>
+                  <span className="font-arabic text-lg text-emerald-500">{surahData.nama}</span>
+                </div>
+              )}
               {surahData.ayat.map((ayat) => {
                 const bookmarked = isBookmarked(surahData.nomor, ayat.nomorAyat);
                 const isPlaying = playingAyat === ayat.nomorAyat;
@@ -492,6 +566,8 @@ const SurahDetail: React.FC = () => {
                   <div
                     key={ayat.nomorAyat}
                     id={`ayat-${ayat.nomorAyat}`}
+                    data-ayat-number={ayat.nomorAyat}
+                    data-surah-number={surahData.nomor}
                     className={[
                       'transition-all duration-300 ease-in-out',
                       'rounded-xl border p-4 md:p-5',
@@ -542,22 +618,24 @@ const SurahDetail: React.FC = () => {
 
                     {/* Arabic text */}
                     <p
-                      className="font-arabic text-right leading-[2.2] mb-3 text-foreground"
-                      style={{ fontSize: fontSizes[fontSize], transition: 'font-size 0.3s ease' }}
+                      className={`font-arabic leading-[2.2] mb-3 text-foreground ${isSmartMode ? 'text-center' : 'text-right'}`}
+                      style={{ fontSize: fontSizes[fontSize], transition: 'font-size 0.3s ease, text-align 0.3s ease' }}
                     >
                       {ayat.teksArab}
                     </p>
 
                     {/* Transliteration */}
                     {showTransliteration && (
-                      <p className="text-muted-foreground italic text-sm mb-2">
+                      <p className={`text-muted-foreground italic text-sm mb-2 ${isSmartMode ? 'text-center' : ''}`}
+                        style={{ transition: 'text-align 0.3s ease' }}>
                         {ayat.teksLatin}
                       </p>
                     )}
 
                     {/* Translation */}
                     {showTranslation && (
-                      <p className="text-foreground/80 text-sm">
+                      <p className={`text-foreground/80 text-sm ${isSmartMode ? 'text-center' : ''}`}
+                        style={{ transition: 'text-align 0.3s ease' }}>
                         {ayat.teksIndonesia}
                       </p>
                     )}
@@ -572,7 +650,7 @@ const SurahDetail: React.FC = () => {
                 {prevSurat ? (
                   <Button
                     variant="outline"
-                    onClick={() => { stopAllAudio(); navigate(`/qiraati/surat/${prevSurat.nomor}`); }}
+                    onClick={() => { stopAllAudio(); navigate(`/qiraati/surat/${prevSurat.nomor}`); if (ayatListRef.current) ayatListRef.current.scrollTop = 0; }}
                     className="flex items-center gap-2"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -583,7 +661,7 @@ const SurahDetail: React.FC = () => {
                 {nextSurat ? (
                   <Button
                     variant="outline"
-                    onClick={() => { stopAllAudio(); navigate(`/qiraati/surat/${nextSurat.nomor}`); }}
+                    onClick={() => { stopAllAudio(); navigate(`/qiraati/surat/${nextSurat.nomor}`); if (ayatListRef.current) ayatListRef.current.scrollTop = 0; }}
                     className="flex items-center gap-2"
                   >
                     <span className="hidden sm:inline">{nextSurat.namaLatin}</span>
@@ -662,27 +740,142 @@ const SurahDetail: React.FC = () => {
       {/* Audio element */}
       <audio ref={audioRef} onEnded={() => setIsPlayingFull(false)} muted={isMuted} />
 
-      {/* ── Smart Mode FAB — Fixed Bottom-Right ── */}
-      {!isSmartMode && (
+      {/* ── Smart Reader Overlay — floating widget ── */}
+      {isSmartMode && (
+        <SmartReaderOverlay
+          mode={isHandMode ? 'hand' : 'face'}
+          videoRef={activeVideoRef}
+          canvasRef={isHandMode ? handCanvasRef : undefined}
+          isReady={activeReady}
+          isFaceLost={isFaceMode ? isFaceLost : false}
+          isTooClose={isFaceMode ? isTooClose : false}
+          headPosition={isFaceMode ? headPosition : 0}
+          error={activeError}
+          debugRefs={isFaceMode ? debugRefs : undefined}
+          gesture={isHandMode ? currentGesture : undefined}
+          isHandDetected={isHandMode ? isHandDetected : undefined}
+          isPinching={isHandMode ? isPinching : undefined}
+          isGrabbing={isHandMode ? isGrabbing : undefined}
+          onClose={() => setIsSmartMode(false)}
+        />
+      )}
+
+      {/* ── Hand Pointer (desktop smart mode) ── */}
+      {isSmartMode && isHandMode && (
+        <HandPointer
+          pointer={handPointer}
+          isPinching={isPinching}
+          isGrabbing={isGrabbing}
+          isActive={isHandDetected}
+          onAyatPlay={(num) => playAyat(num)}
+          onAyatBookmark={(num) => {
+            if (surahData) toggleBookmark(surahData.nomor, surahData.namaLatin, num);
+          }}
+          onAyatTafsir={(num) => openTafsir(num)}
+          onAyatCopy={(num) => {
+            const ayat = surahData?.ayat.find(a => a.nomorAyat === num);
+            if (ayat) {
+              navigator.clipboard.writeText(ayat.teksArab);
+              toast({ title: 'Tersalin', description: `Ayat ${num} disalin ke clipboard` });
+            }
+          }}
+        />
+      )}
+
+      {/* ── Close Smart Mode — Fixed Bottom Center ── */}
+      {isSmartMode && (
         <button
-          onClick={() => setIsSmartMode(true)}
+          onClick={() => setIsSmartMode(false)}
           className="
-            fixed z-40 right-4 flex items-center gap-2
-            bg-violet-600 hover:bg-violet-500 active:bg-violet-700
-            text-white shadow-lg shadow-violet-600/30 hover:shadow-violet-500/40
+            fixed z-40 left-1/2 -translate-x-1/2
+            flex items-center gap-2
+            bg-red-600/90 hover:bg-red-500 active:bg-red-700
+            text-white shadow-lg shadow-red-600/30
             rounded-full transition-all duration-200 active:scale-95
-            px-4 py-3 sm:px-5
+            px-5 py-2.5 backdrop-blur-sm
           "
           style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
-          title="Aktifkan Smart Mode (gesture scroll)"
+          title="Matikan Smart Mode"
         >
-          <ScanFace className="w-5 h-5" />
-          <span className="text-sm font-medium hidden sm:inline">Smart</span>
+          <X className="w-4 h-4" />
+          <span className="text-sm font-medium">Matikan Smart Mode</span>
         </button>
       )}
 
+      {/* ── Smart Mode FABs — Fixed Bottom-Right ── */}
+      {!isSmartMode && (
+        <div
+          className="fixed z-40 right-4 flex flex-col gap-2"
+          style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+        >
+          {/* Hand Gesture FAB — desktop only */}
+          {!isMobile && (
+            <button
+              onClick={() => {
+                setOnboardingType('hand');
+                if (localStorage.getItem('smartmode-onboarding-skip-hand') === 'true') {
+                  setGestureType('hand');
+                  setIsSmartMode(true);
+                } else {
+                  setSmartOnboardingOpen(true);
+                }
+              }}
+              className="
+                flex items-center gap-2
+                bg-sky-600 hover:bg-sky-500 active:bg-sky-700
+                text-white shadow-lg shadow-sky-600/30 hover:shadow-sky-500/40
+                rounded-full transition-all duration-200 active:scale-95
+                px-4 py-3 sm:px-5
+              "
+              title="Smart Mode — Hand Gesture (desktop)"
+            >
+              <Hand className="w-5 h-5" />
+              <span className="text-sm font-medium hidden sm:inline">Hand</span>
+            </button>
+          )}
+
+          {/* Face Gesture FAB — always visible */}
+          <button
+            onClick={() => {
+              setOnboardingType('head');
+              if (localStorage.getItem('smartmode-onboarding-skip-head') === 'true') {
+                setGestureType('head');
+                setIsSmartMode(true);
+              } else {
+                setSmartOnboardingOpen(true);
+              }
+            }}
+            className="
+              flex items-center gap-2
+              bg-violet-600 hover:bg-violet-500 active:bg-violet-700
+              text-white shadow-lg shadow-violet-600/30 hover:shadow-violet-500/40
+              rounded-full transition-all duration-200 active:scale-95
+              px-4 py-3 sm:px-5
+            "
+            title="Smart Mode — Face Gesture"
+          >
+            <ScanFace className="w-5 h-5" />
+            <span className="text-sm font-medium hidden sm:inline">Smart</span>
+          </button>
+        </div>
+      )}
+
+      {/* ── Smart Mode Onboarding Drawer ── */}
+      <SmartModeOnboarding
+        open={smartOnboardingOpen}
+        onOpenChange={setSmartOnboardingOpen}
+        gestureType={onboardingType}
+        onActivate={() => {
+          setGestureType(onboardingType);
+          setIsSmartMode(true);
+        }}
+      />
+
       {/* ── Search Widget (FAB + Drawer) ── */}
+      {/* In hand mode: FAB hidden but widget controllable via gestures */}
       <SearchWidget
+        ref={searchWidgetRef}
+        hideFab={isSmartMode}
         allSurahs={allSurahs}
         surahData={surahData}
         onPlayFullSurah={playFullSurah}

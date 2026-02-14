@@ -1,16 +1,37 @@
 import React from 'react';
-import { Loader2, Camera, X, ChevronDown, ChevronUp, AlertTriangle, EyeOff } from 'lucide-react';
+import { Loader2, Camera, X, ChevronDown, ChevronUp, AlertTriangle, EyeOff, Hand } from 'lucide-react';
+import type { HandGestureName } from '@/hooks/useHandGesture';
+
+// ─── Types ───
+type OverlayMode = 'face' | 'hand';
 
 interface SmartReaderOverlayProps {
+    mode?: OverlayMode;
     videoRef: React.RefObject<HTMLVideoElement>;
+    canvasRef?: React.RefObject<HTMLCanvasElement>;
     isReady: boolean;
     isFaceLost?: boolean;
     isTooClose?: boolean;
     headPosition?: number;
     error?: string | null;
     debugRefs?: { ratio: React.MutableRefObject<number>; speed: React.MutableRefObject<number> };
+    // Hand mode extras
+    gesture?: HandGestureName;
+    isHandDetected?: boolean;
+    isPinching?: boolean;
+    isGrabbing?: boolean;
     onClose: () => void;
 }
+
+// ─── Gesture Icon Map ───
+const GESTURE_EMOJI: Record<string, string> = {
+    Open_Palm: '✋',
+    Closed_Fist: '✊',
+    Thumb_Up: '👍',
+    Victory: '✌️',
+    Pointing_Up: '☝️',
+    None: '—',
+};
 
 // ─── Vertical Scroll Indicator Bar ───
 const ScrollIndicatorBar: React.FC<{
@@ -74,38 +95,46 @@ const StatusDot: React.FC<{ isReady: boolean; isFaceLost: boolean }> = ({ isRead
 /**
  * SmartReaderOverlay — Floating mini widget (bottom-right)
  * 
- * Gesture-only (no voice). Single container transitions between
- * collapsed-pill and expanded-card via CSS classes.
- * ONE <video> element always mounted — no canvas mirror.
+ * Supports two modes:
+ * - face: Head gesture scrolling with scroll indicator bar
+ * - hand: Hand gesture with gesture label + camera preview
  */
 const SmartReaderOverlay: React.FC<SmartReaderOverlayProps> = ({
+    mode = 'face',
     videoRef,
+    canvasRef,
     isReady,
     isFaceLost = false,
     isTooClose = false,
     headPosition = 0,
     error,
     debugRefs,
+    gesture = 'None',
+    isHandDetected = false,
+    isPinching = false,
+    isGrabbing = false,
     onClose,
 }) => {
     const [isExpanded, setIsExpanded] = React.useState(false);
     const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
 
     React.useEffect(() => {
-        if (!debugRefs) return;
+        if (!debugRefs || mode !== 'face') return;
         const interval = setInterval(() => forceUpdate(), 200);
         return () => clearInterval(interval);
-    }, [debugRefs]);
+    }, [debugRefs, mode]);
 
     return (
         <>
-            {/* ── Vertical Scroll Indicator Bar ── */}
-            <ScrollIndicatorBar
-                headPosition={headPosition}
-                isFaceLost={isFaceLost}
-                isTooClose={isTooClose}
-                isReady={isReady}
-            />
+            {/* ── Vertical Scroll Indicator Bar (face mode only) ── */}
+            {mode === 'face' && (
+                <ScrollIndicatorBar
+                    headPosition={headPosition}
+                    isFaceLost={isFaceLost}
+                    isTooClose={isTooClose}
+                    isReady={isReady}
+                />
+            )}
 
             {/* ── SINGLE Floating Widget container ── */}
             <div
@@ -139,6 +168,14 @@ const SmartReaderOverlay: React.FC<SmartReaderOverlayProps> = ({
                         className="w-full h-full object-cover"
                         style={{ transform: 'scaleX(-1)' }}
                     />
+                    {/* Canvas overlay for hand landmarks */}
+                    {mode === 'hand' && canvasRef && (
+                        <canvas
+                            ref={canvasRef}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            style={{ transform: 'scaleX(-1)', pointerEvents: 'none' }}
+                        />
+                    )}
                     {/* Loading Overlay */}
                     {!isReady && !error && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-white gap-1 z-10">
@@ -152,18 +189,33 @@ const SmartReaderOverlay: React.FC<SmartReaderOverlayProps> = ({
                             <span className="text-[9px] font-medium leading-tight">{error}</span>
                         </div>
                     )}
-                    {/* Face Lost Overlay */}
-                    {isReady && isFaceLost && !error && (
+                    {/* Face Lost Overlay (face mode) */}
+                    {mode === 'face' && isReady && isFaceLost && !error && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-500/70 text-white gap-0.5 z-10">
                             <EyeOff className={isExpanded ? 'w-4 h-4' : 'w-3 h-3'} />
                             {isExpanded && <span className="text-[9px] font-medium">Wajah Hilang</span>}
                         </div>
                     )}
-                    {/* Debug Overlay */}
-                    {isExpanded && isReady && debugRefs && debugRefs.ratio && (
+                    {/* Hand Not Detected Overlay (hand mode) */}
+                    {mode === 'hand' && isReady && !isHandDetected && !error && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-amber-500/70 text-white gap-0.5 z-10">
+                            <Hand className={isExpanded ? 'w-4 h-4' : 'w-3 h-3'} />
+                            {isExpanded && <span className="text-[9px] font-medium">Tangan Hilang</span>}
+                        </div>
+                    )}
+                    {/* Debug Overlay (face mode) */}
+                    {mode === 'face' && isExpanded && isReady && debugRefs && debugRefs.ratio && (
                         <div className="absolute top-0 left-0 bg-black/60 text-white text-[8px] p-0.5 font-mono rounded-br-md z-10">
                             Y: {debugRefs.ratio.current.toFixed(3)} <br />
                             S: {debugRefs.speed.current.toFixed(0)}
+                        </div>
+                    )}
+                    {/* Gesture Label (hand mode) */}
+                    {mode === 'hand' && isExpanded && isReady && (
+                        <div className="absolute top-0 left-0 bg-black/60 text-white text-[8px] p-0.5 font-mono rounded-br-md z-10">
+                            {GESTURE_EMOJI[gesture] || '—'} {gesture}
+                            {isPinching && <><br />🤏 Click</>}
+                            {isGrabbing && <><br />✊ Scroll</>}
                         </div>
                     )}
                 </div>
@@ -171,37 +223,75 @@ const SmartReaderOverlay: React.FC<SmartReaderOverlayProps> = ({
                 {/* ── Collapsed: inline status next to video ── */}
                 {!isExpanded && (
                     <div className="flex items-center gap-2 px-3 py-2.5">
-                        <StatusDot isReady={isReady} isFaceLost={isFaceLost} />
-                        <Camera className={`w-3 h-3 ${isReady ? (isFaceLost ? 'text-red-500' : 'text-emerald-500') : 'text-muted-foreground'}`} />
+                        <StatusDot
+                            isReady={isReady}
+                            isFaceLost={mode === 'face' ? isFaceLost : !isHandDetected}
+                        />
+                        {mode === 'face' ? (
+                            <Camera className={`w-3 h-3 ${isReady ? (isFaceLost ? 'text-red-500' : 'text-emerald-500') : 'text-muted-foreground'}`} />
+                        ) : (
+                            <Hand className={`w-3 h-3 ${isReady ? (isHandDetected ? 'text-emerald-500' : 'text-amber-500') : 'text-muted-foreground'}`} />
+                        )}
                     </div>
                 )}
 
                 {/* ── Expanded: status + controls ── */}
                 {isExpanded && (
                     <div className="space-y-1">
-                        {/* Face status */}
+                        {/* Status */}
                         <div className="flex items-center justify-between text-[10px]">
                             <span className="flex items-center gap-1">
-                                <Camera className={`w-2.5 h-2.5 ${isReady ? (isFaceLost ? 'text-red-500' : 'text-emerald-500') : 'text-muted-foreground'}`} />
+                                {mode === 'face' ? (
+                                    <Camera className={`w-2.5 h-2.5 ${isReady ? (isFaceLost ? 'text-red-500' : 'text-emerald-500') : 'text-muted-foreground'}`} />
+                                ) : (
+                                    <Hand className={`w-2.5 h-2.5 ${isReady ? (isHandDetected ? 'text-emerald-500' : 'text-amber-500') : 'text-muted-foreground'}`} />
+                                )}
                                 <span className={
-                                    isReady ? (isFaceLost ? 'text-red-500' : 'text-emerald-500') : 'text-muted-foreground'
+                                    isReady
+                                        ? mode === 'face'
+                                            ? (isFaceLost ? 'text-red-500' : 'text-emerald-500')
+                                            : (isHandDetected ? 'text-emerald-500' : 'text-amber-500')
+                                        : 'text-muted-foreground'
                                 }>
-                                    {isReady ? (isFaceLost ? 'Hilang' : '✓ Aktif') : 'Memuat...'}
+                                    {isReady
+                                        ? mode === 'face'
+                                            ? (isFaceLost ? 'Hilang' : '✓ Aktif')
+                                            : (isHandDetected ? `✓ ${GESTURE_EMOJI[gesture] || ''} ${gesture !== 'None' ? gesture : 'Aktif'}` : 'Menunggu...')
+                                        : 'Memuat...'}
                                 </span>
                             </span>
                         </div>
 
-                        {/* Too Close Warning */}
-                        {isReady && isTooClose && !isFaceLost && (
+                        {/* Mode-specific warnings */}
+                        {mode === 'face' && isReady && isTooClose && !isFaceLost && (
                             <div className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/15 border border-amber-500/40 rounded-md">
                                 <AlertTriangle className="w-2.5 h-2.5 text-amber-500 flex-shrink-0" />
                                 <span className="text-[9px] text-amber-500 font-medium">Terlalu Dekat!</span>
                             </div>
                         )}
 
+                        {/* Pinch / Grab indicator (hand mode) */}
+                        {mode === 'hand' && isReady && isPinching && (
+                            <div className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/15 border border-emerald-500/40 rounded-md">
+                                <span className="text-[9px]">🤏</span>
+                                <span className="text-[9px] text-emerald-400 font-medium">Pinch Click</span>
+                            </div>
+                        )}
+                        {mode === 'hand' && isReady && isGrabbing && (
+                            <div className="flex items-center gap-1 px-1.5 py-0.5 bg-violet-500/15 border border-violet-500/40 rounded-md">
+                                <span className="text-[9px]">✊</span>
+                                <span className="text-[9px] text-violet-400 font-medium">Grab Scroll</span>
+                            </div>
+                        )}
+
                         {/* Instruction */}
                         <p className="text-[9px] text-muted-foreground leading-tight text-center">
-                            {error ? "Error" : !isReady ? "Memuat model AI..." : isFaceLost ? "Arahkan wajah ke kamera" : isTooClose ? "Jauhkan wajah" : "Tundukkan untuk scroll ↓"}
+                            {error ? "Error"
+                                : !isReady ? "Memuat model AI..."
+                                    : mode === 'face'
+                                        ? (isFaceLost ? "Arahkan wajah ke kamera" : isTooClose ? "Jauhkan wajah" : "Tundukkan untuk scroll ↓")
+                                        : (!isHandDetected ? "Tampilkan tangan ke kamera" : isGrabbing ? "✊ Grab Scroll" : "Pointer ☝️ • Pinch 🤏 Click • Grab ✊ Scroll")
+                            }
                         </p>
 
                         {/* ── Action Buttons ── */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Search, Mic, X, Loader2,
@@ -16,6 +16,7 @@ import { useFuseSearch } from '@/hooks/useFuseSearch';
 import { useVectorSearch, VectorSearchResult } from '@/hooks/useVectorSearch';
 import { useVoice } from '@/hooks/useVoice';
 import { useToast } from '@/hooks/use-toast';
+import { parseVoiceCommand, removePrefixes } from '@/utils/voiceCommandUtils';
 import type { Surat, Ayat, SuratDetail } from '@/types/quran';
 
 // ─── Types ───
@@ -32,20 +33,27 @@ interface SearchWidgetProps {
     onToggleBookmark?: (nomor: number, nama: string, ayat: number) => void;
     isBookmarked?: (nomor: number, ayat: number) => boolean;
     isPlayingFull?: boolean;
+    /** Hide the FAB button (e.g. in smart mode) */
+    hideFab?: boolean;
+}
+
+// ─── Imperative Handle ───
+
+export interface SearchWidgetHandle {
+    open: () => void;
+    close: () => void;
+    toggle: () => void;
+    openWithMic: () => void;
+    isOpen: boolean;
 }
 
 // ─── Search Mode Tabs ───
 
 type SearchMode = 'surah' | 'ayat';
 
-const PREFIX_REGEX = /^(surat|surah|baca|buka|cari)(\s+|$)/i;
-function removePrefixes(str: string): string {
-    return str.toLowerCase().replace(PREFIX_REGEX, '').trim();
-}
-
 // ─── Component ───
 
-const SearchWidget: React.FC<SearchWidgetProps> = ({
+const SearchWidget = forwardRef<SearchWidgetHandle, SearchWidgetProps>(({
     allSurahs,
     surahData,
     onPlayFullSurah,
@@ -54,7 +62,8 @@ const SearchWidget: React.FC<SearchWidgetProps> = ({
     onToggleBookmark,
     isBookmarked,
     isPlayingFull = false,
-}) => {
+    hideFab = false,
+}, ref) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchMode, setSearchMode] = useState<SearchMode>('surah');
@@ -62,6 +71,19 @@ const SearchWidget: React.FC<SearchWidgetProps> = ({
     const [isVectorLoading, setIsVectorLoading] = useState(false);
     const [isVoiceActive, setIsVoiceActive] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // ── Imperative Handle (for hand gesture control) ──
+    useImperativeHandle(ref, () => ({
+        open: () => setIsOpen(true),
+        close: () => setIsOpen(false),
+        toggle: () => setIsOpen(prev => !prev),
+        openWithMic: () => {
+            setIsOpen(true);
+            // Activate voice after drawer animation completes
+            setTimeout(() => setIsVoiceActive(true), 300);
+        },
+        isOpen,
+    }), [isOpen]);
     const autoSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const navigate = useNavigate();
@@ -125,6 +147,82 @@ const SearchWidget: React.FC<SearchWidgetProps> = ({
         if (text) setSearchQuery(text);
     }, [fullTranscript, interimTranscript, isVoiceActive, isOpen]);
 
+    // ── Voice auto-execute: auto-navigate after transcript stabilizes (2s debounce) ──
+    const voiceAutoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const executeVoiceSearch = useCallback((text: string) => {
+        if (!text.trim()) return;
+
+        const result = parseVoiceCommand(text, fuseSearch);
+
+        switch (result.type) {
+            case 'multi_surah_rejected':
+                toast({
+                    variant: 'destructive',
+                    title: 'Satu Surat Saja',
+                    description: 'Silakan sebutkan satu nama surat saja. Contoh: "Surat Yasin" atau "Al-Mulk".',
+                });
+                resetTranscript();
+                break;
+
+            case 'surah_navigate':
+                setIsOpen(false);
+                navigate(`/qiraati/surat/${result.surahNomor}`);
+                toast({ title: 'Membuka Surat', description: result.surahNamaLatin });
+                break;
+
+            case 'surah_ayat_navigate':
+                setIsOpen(false);
+                navigate(`/qiraati/surat/${result.surahNomor}#ayat-${result.ayatNumber}`, {
+                    state: { autoPlayAyat: result.ayatNumber },
+                });
+                toast({ title: 'Membuka Surat', description: `${result.surahNamaLatin} Ayat ${result.ayatNumber}` });
+                break;
+
+            case 'content_search':
+                // Switch to ayat tab and trigger vector search
+                setSearchMode('ayat');
+                setSearchQuery(result.searchQuery);
+                resetTranscript();
+                break;
+
+            case 'not_found':
+                toast({
+                    variant: 'destructive',
+                    title: 'Tidak Ditemukan',
+                    description: `Surat "${result.originalText}" tidak ditemukan. Coba nama lain atau gunakan tab Ayat AI.`,
+                });
+                resetTranscript();
+                break;
+        }
+    }, [fuseSearch, navigate, toast, resetTranscript]);
+
+    useEffect(() => {
+        if (voiceAutoRef.current) {
+            clearTimeout(voiceAutoRef.current);
+            voiceAutoRef.current = null;
+        }
+
+        // Only auto-execute when voice is active, drawer is open, and in surah mode
+        if (!isVoiceActive || !isOpen || searchMode !== 'surah') return;
+        // Wait until interim settles (no partial results)
+        if (!fullTranscript || interimTranscript) return;
+
+        voiceAutoRef.current = setTimeout(() => {
+            voiceAutoRef.current = null;
+            if (fullTranscript.trim().length > 0) {
+                executeVoiceSearch(fullTranscript);
+            }
+        }, 2000);
+
+        return () => {
+            if (voiceAutoRef.current) {
+                clearTimeout(voiceAutoRef.current);
+                voiceAutoRef.current = null;
+            }
+        };
+    }, [fullTranscript, interimTranscript, isVoiceActive, isOpen, searchMode, executeVoiceSearch]);
+
     // ── Surah Search (Fuse.js) ──
     const surahResults = React.useMemo(() => {
         if (!searchQuery.trim() || searchMode !== 'surah') return [];
@@ -184,24 +282,26 @@ const SearchWidget: React.FC<SearchWidgetProps> = ({
     return (
         <>
             {/* ── FAB Trigger — Fixed Bottom-Left ── */}
-            <button
-                onClick={() => setIsOpen(true)}
-                className="
+            {!hideFab && (
+                <button
+                    onClick={() => setIsOpen(true)}
+                    className="
           fixed z-40 left-4 flex items-center gap-2
           bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700
           text-white shadow-lg shadow-emerald-600/30 hover:shadow-emerald-500/40
           rounded-full transition-all duration-200 active:scale-95
           px-4 py-3 sm:px-5
         "
-                style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
-                title="Cari surat atau ayat (Ctrl+K)"
-            >
-                <Search className="w-5 h-5" />
-                <span className="text-sm font-medium hidden sm:inline">Cari</span>
-                <kbd className="hidden md:inline-flex items-center gap-0.5 text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">
-                    ⌘K
-                </kbd>
-            </button>
+                    style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+                    title="Cari surat atau ayat (Ctrl+K)"
+                >
+                    <Search className="w-5 h-5" />
+                    <span className="text-sm font-medium hidden sm:inline">Cari</span>
+                    <kbd className="hidden md:inline-flex items-center gap-0.5 text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-mono">
+                        ⌘K
+                    </kbd>
+                </button>
+            )}
 
             {/* ── Drawer ── */}
             <Drawer open={isOpen} onOpenChange={setIsOpen}>
@@ -326,8 +426,8 @@ const SearchWidget: React.FC<SearchWidgetProps> = ({
                                                     {r.data.nama_surat}{r.data.nomor_ayat ? ` : ${r.data.nomor_ayat}` : ''}
                                                 </p>
                                                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${r.relevansi === 'tinggi' ? 'bg-emerald-500/20 text-emerald-400' :
-                                                        r.relevansi === 'sedang' ? 'bg-yellow-500/20 text-yellow-400' :
-                                                            'bg-muted text-muted-foreground'
+                                                    r.relevansi === 'sedang' ? 'bg-yellow-500/20 text-yellow-400' :
+                                                        'bg-muted text-muted-foreground'
                                                     }`}>
                                                     {Math.round(r.skor * 100)}%
                                                 </span>
@@ -434,6 +534,8 @@ const SearchWidget: React.FC<SearchWidgetProps> = ({
             </Drawer>
         </>
     );
-};
+});
+
+SearchWidget.displayName = 'SearchWidget';
 
 export default SearchWidget;

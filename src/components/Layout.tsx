@@ -2,15 +2,18 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Navbar } from './ui/navbar';
 import { Footer } from './ui/footer';
+import { useSmartReader } from '@/providers/SmartReaderHooks';
 
 const Layout = () => {
+  const { isSmartMode } = useSmartReader();
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-grow">
+    <div className={`flex flex-col ${isSmartMode ? '' : 'min-h-screen'}`}>
+      {!isSmartMode && <Navbar />}
+      <main className={isSmartMode ? '' : 'flex-grow'}>
         <Outlet />
       </main>
-      <Footer />
+      {!isSmartMode && <Footer />}
     </div>
   );
 };
