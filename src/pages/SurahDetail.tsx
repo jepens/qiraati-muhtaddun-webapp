@@ -33,10 +33,9 @@ import {
 import { useBookmarks } from '@/hooks/useBookmarks';
 import { useLastRead } from '@/hooks/useLastRead';
 import { useFaceScroll } from '@/hooks/useFaceScroll';
-import { useVoice, VoiceCommand } from '@/hooks/useVoice';
-import { useFuseSearch } from '@/hooks/useFuseSearch';
-import { useVectorSearch } from '@/hooks/useVectorSearch';
+
 import SmartReaderOverlay from '@/components/SmartReaderOverlay';
+import SearchWidget from '@/components/SearchWidget';
 import { useSmartReader } from '@/providers/SmartReaderHooks';
 import SurahSidebar from '@/components/SurahSidebar';
 import { useToast } from '@/hooks/use-toast';
@@ -61,20 +60,7 @@ const SurahDetail: React.FC = () => {
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { updateLastRead } = useLastRead();
 
-  // Vector Search API (equran.id semantic search for smart mode)
-  const { search: vectorSearch } = useVectorSearch();
 
-  // Fuse Search for voice commands (navigate to other surahs directly)
-  const { search: fuseSearch } = useFuseSearch(allSurahs, {
-    keys: [
-      { name: 'nomor', weight: 1 },
-      { name: 'namaLatin', weight: 0.7 },
-      { name: 'nama', weight: 0.5 },
-      { name: 'arti', weight: 0.4 }
-    ],
-    threshold: 0.3,
-    ignoreDiacritics: true,
-  });
 
   // UI State
   const [isPlayingFull, setIsPlayingFull] = useState(false);
@@ -336,213 +322,8 @@ const SurahDetail: React.FC = () => {
     onScroll: handleFaceScroll,
   });
 
-  // ─── Voice Commands Registry (Context7 — command pattern) ───
-  const voiceCommands: VoiceCommand[] = useMemo(() => [
-    // Play / Pause / Stop
-    { command: /(?:putar|baca|mulai)/, callback: () => playFullSurah(), description: 'Memutar audio...' },
-    { command: /(?:berhenti|stop|jeda)/, callback: () => stopAllAudio(), description: 'Audio dihentikan.' },
-    // Play specific ayat
-    {
-      command: /(?:baca|putar)?\s*ayat\s+(\d+)/, callback: (ayatStr: string) => {
-        const num = parseInt(ayatStr);
-        playAyat(num);
-        document.getElementById(`ayat-${num}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, description: 'Memutar ayat...'
-    },
-    // Open surah with ayat
-    {
-      command: /(?:buka|putar|baca)?\s*(?:surat|surah)?\s+(.+?)\s+ayat\s+(\d+)/, callback: (surahName: string, ayatStr: string) => {
-        const results = fuseSearch(surahName.trim());
-        if (results.length > 0) {
-          stopAllAudio();
-          navigate(`/qiraati/surat/${results[0].nomor}#ayat-${ayatStr}`, {
-            state: { autoPlayAyat: parseInt(ayatStr) }
-          });
-          toast({ title: 'Membuka Surat', description: `${results[0].namaLatin} Ayat ${ayatStr}` });
-        } else {
-          toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Surat "${surahName}" tidak ditemukan.` });
-        }
-      }, description: 'Membuka surah...'
-    },
-    // Open surah
-    {
-      command: /(?:buka|putar|baca)?\s*(?:surat|surah)\s+(.+)/, callback: (surahName: string) => {
-        if (surahName.includes('ayat')) return;
-        const results = fuseSearch(surahName.trim());
-        if (results.length > 0) {
-          stopAllAudio();
-          navigate(`/qiraati/surat/${results[0].nomor}`);
-          toast({ title: 'Membuka Surat', description: results[0].namaLatin });
-        } else {
-          toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Surat "${surahName}" tidak ditemukan.` });
-        }
-      }, description: 'Membuka surah...'
-    },
-    // Fallback "buka X"
-    {
-      command: /^(?:buka|baca)\s+(?!ayat)(.+)/, callback: (surahName: string) => {
-        const clean = surahName.replace('surah', '').trim();
-        if (!clean || clean.includes('ayat')) return;
-        const results = fuseSearch(clean);
-        if (results.length > 0) {
-          stopAllAudio();
-          navigate(`/qiraati/surat/${results[0].nomor}`);
-          toast({ title: 'Membuka Surat', description: results[0].namaLatin });
-        } else {
-          toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Surat "${clean}" tidak ditemukan.` });
-        }
-      }, description: 'Membuka surah...'
-    },
-    // Scroll
-    { command: /(?:turun|scroll)/, callback: () => setAutoScroll(true), description: 'Scroll aktif.' },
-    { command: /(?:berhenti scroll|stop scroll)/, callback: () => setAutoScroll(false), description: 'Scroll nonaktif.' },
 
-    // ── Phase 2: New Commands ──
 
-    // Tafsir
-    {
-      command: /(?:tafsir|buka tafsir)\s*(?:ayat\s+)?(\d+)?/, callback: (ayatStr?: string) => {
-        const ayatNum = ayatStr ? parseInt(ayatStr) : 1;
-        openTafsir(ayatNum);
-      }, description: 'Membuka tafsir...'
-    },
-
-    // Font size
-    {
-      command: /font (?:besar|lebih besar|perbesar)/, callback: () => {
-        const sizes: Array<typeof fontSize> = ['sm', 'md', 'lg', 'xl'];
-        const idx = sizes.indexOf(fontSize);
-        if (idx < sizes.length - 1) handleFontSizeChange(sizes[idx + 1]);
-      }, description: 'Font diperbesar.'
-    },
-    {
-      command: /font (?:kecil|lebih kecil|perkecil)/, callback: () => {
-        const sizes: Array<typeof fontSize> = ['sm', 'md', 'lg', 'xl'];
-        const idx = sizes.indexOf(fontSize);
-        if (idx > 0) handleFontSizeChange(sizes[idx - 1]);
-      }, description: 'Font diperkecil.'
-    },
-
-    // Bookmark
-    {
-      command: /(?:bookmark|simpan|tandai)\s*(?:ayat\s+)?(\d+)?/, callback: (ayatStr?: string) => {
-        if (!surahData) return;
-        const ayatNum = ayatStr ? parseInt(ayatStr) : 1;
-        toggleBookmark(surahData.nomor, surahData.namaLatin, ayatNum);
-      }, description: 'Bookmark disimpan.'
-    },
-
-    // Navigation between surahs
-    {
-      command: /(?:selanjutnya|surah selanjutnya|surah berikutnya|next)/, callback: () => {
-        if (nextSurat) { stopAllAudio(); navigate(`/qiraati/surat/${nextSurat.nomor}`); }
-      }, description: 'Surah selanjutnya...'
-    },
-    {
-      command: /(?:sebelumnya|surah sebelumnya|kembali|previous)/, callback: () => {
-        if (prevSurat) { stopAllAudio(); navigate(`/qiraati/surat/${prevSurat.nomor}`); }
-      }, description: 'Surah sebelumnya...'
-    },
-
-    // Toggle transliteration / translation
-    {
-      command: /transliterasi/, callback: () => {
-        setShowTransliteration(prev => !prev);
-      }, description: showTransliteration ? 'Transliterasi dinonaktifkan.' : 'Transliterasi diaktifkan.'
-    },
-    {
-      command: /terjemahan/, callback: () => {
-        setShowTranslation(prev => !prev);
-      }, description: showTranslation ? 'Terjemahan dinonaktifkan.' : 'Terjemahan diaktifkan.'
-    },
-
-    // Random ayat
-    {
-      command: /(?:ayat acak|bacakan ayat acak|acak)/, callback: () => {
-        if (!surahData?.ayat?.length) return;
-        const randomIdx = Math.floor(Math.random() * surahData.ayat.length);
-        const ayat = surahData.ayat[randomIdx];
-        playAyat(ayat.nomorAyat);
-        document.getElementById(`ayat-${ayat.nomorAyat}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, description: 'Memutar ayat acak...'
-    },
-
-    // Copy ayat
-    {
-      command: /(?:salin|copy)\s*(?:ayat\s+)?(\d+)?/, callback: (ayatStr?: string) => {
-        if (!surahData?.ayat?.length) return;
-        const ayatNum = ayatStr ? parseInt(ayatStr) : 1;
-        const ayat = surahData.ayat.find(a => a.nomorAyat === ayatNum);
-        if (ayat) copyAyat(ayat);
-      }, description: 'Ayat disalin.'
-    },
-
-    // Share ayat
-    {
-      command: /(?:bagikan|share)\s*(?:ayat\s+)?(\d+)?/, callback: (ayatStr?: string) => {
-        if (!surahData?.ayat?.length) return;
-        const ayatNum = ayatStr ? parseInt(ayatStr) : 1;
-        const ayat = surahData.ayat.find(a => a.nomorAyat === ayatNum);
-        if (ayat) shareAyat(ayat);
-      }, description: 'Ayat dibagikan.'
-    },
-
-    // ── AI Vector Search (semantic ayat search) ──
-    {
-      command: /(?:cari|temukan|search)\s*(?:ayat\s+)?(?:tentang\s+)?(.+)/, callback: (query: string) => {
-        const clean = query.trim();
-        if (!clean || clean.length < 2) return;
-        toast({ title: '🔍 Mencari...', description: `AI Vector Search: "${clean}"` });
-        vectorSearch(clean, { tipe: ['ayat'], batas: 5, skorMin: 0.3 }).then(results => {
-          if (results.length > 0) {
-            const first = results[0];
-            const preview = first.data.terjemahan_id?.substring(0, 80) || '';
-            toast({
-              title: `🔍 ${first.data.nama_surat} : ${first.data.nomor_ayat}`,
-              description: `${preview}...`,
-            });
-            // Navigate to the first result
-            if (first.data.id_surat) {
-              stopAllAudio();
-              navigate(`/qiraati/surat/${first.data.id_surat}${first.data.nomor_ayat ? `#ayat-${first.data.nomor_ayat}` : ''}`, {
-                state: first.data.nomor_ayat ? { autoPlayAyat: first.data.nomor_ayat } : undefined
-              });
-            }
-          } else {
-            toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Tidak ada ayat tentang "${clean}".` });
-          }
-        });
-      }, description: 'Mencari ayat...'
-    },
-
-  ], [playFullSurah, playAyat, stopAllAudio, navigate, openTafsir, fontSize, handleFontSizeChange, surahData, toggleBookmark, nextSurat, prevSurat, showTransliteration, showTranslation, copyAyat, shareAyat, fuseSearch, toast, vectorSearch]);
-
-  // ─── Mute mic state ───
-  const [isMicMuted, setIsMicMuted] = useState(false);
-
-  const { isListening, isProcessing, isSpeaking, lastCommand, error: voiceError, startListening, stopListening } = useVoice({
-    mode: 'command',
-    commands: voiceCommands,
-    enabled: isSmartMode && !isMicMuted,
-  });
-
-  const handleToggleMic = useCallback(() => {
-    setIsMicMuted(prev => {
-      if (!prev) {
-        // Muting — stop listening
-        stopListening();
-      } else {
-        // Unmuting — start listening
-        startListening();
-      }
-      return !prev;
-    });
-  }, [stopListening, startListening]);
-
-  // Reset mic mute when exiting smart mode
-  useEffect(() => {
-    if (!isSmartMode) setIsMicMuted(false);
-  }, [isSmartMode]);
 
   return (
     <div className="flex min-h-screen">
@@ -680,13 +461,7 @@ const SurahDetail: React.FC = () => {
                   <div className="h-1 bg-secondary rounded-full overflow-hidden">
                     <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${scrollProgress}%` }} />
                   </div>
-                  {/* Smart Reader */}
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-muted-foreground min-w-[80px]">Smart:</span>
-                    <Button size="sm" variant={isSmartMode ? 'default' : 'outline'} onClick={() => setIsSmartMode(!isSmartMode)}>
-                      <ScanFace className="w-3 h-3 mr-1" /> {isSmartMode ? 'Matikan' : 'Aktifkan'}
-                    </Button>
-                  </div>
+
                 </div>
               </details>
             )}
@@ -695,20 +470,12 @@ const SurahDetail: React.FC = () => {
               <SmartReaderOverlay
                 videoRef={videoRef}
                 isReady={isFaceReady}
-                isListening={isListening}
-                isSpeaking={isSpeaking}
-                isProcessing={isProcessing}
                 isFaceLost={isFaceLost}
                 isTooClose={isTooClose}
                 headPosition={headPosition}
-                lastCommand={lastCommand}
-                error={faceError || voiceError}
+                error={faceError}
                 debugRefs={debugRefs}
                 onClose={() => setIsSmartMode(false)}
-                onRetry={startListening}
-                isMicMuted={isMicMuted}
-                onToggleMic={handleToggleMic}
-                surahName={surahData?.namaLatin}
               />
             )}
 
@@ -894,6 +661,37 @@ const SurahDetail: React.FC = () => {
 
       {/* Audio element */}
       <audio ref={audioRef} onEnded={() => setIsPlayingFull(false)} muted={isMuted} />
+
+      {/* ── Smart Mode FAB — Fixed Bottom-Right ── */}
+      {!isSmartMode && (
+        <button
+          onClick={() => setIsSmartMode(true)}
+          className="
+            fixed z-40 right-4 flex items-center gap-2
+            bg-violet-600 hover:bg-violet-500 active:bg-violet-700
+            text-white shadow-lg shadow-violet-600/30 hover:shadow-violet-500/40
+            rounded-full transition-all duration-200 active:scale-95
+            px-4 py-3 sm:px-5
+          "
+          style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+          title="Aktifkan Smart Mode (gesture scroll)"
+        >
+          <ScanFace className="w-5 h-5" />
+          <span className="text-sm font-medium hidden sm:inline">Smart</span>
+        </button>
+      )}
+
+      {/* ── Search Widget (FAB + Drawer) ── */}
+      <SearchWidget
+        allSurahs={allSurahs}
+        surahData={surahData}
+        onPlayFullSurah={playFullSurah}
+        onStopAudio={stopAllAudio}
+        onPlayAyat={playAyat}
+        onToggleBookmark={toggleBookmark}
+        isBookmarked={isBookmarked}
+        isPlayingFull={isPlayingFull}
+      />
     </div>
   );
 };
