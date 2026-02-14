@@ -121,6 +121,7 @@ export const useVoice = ({
 
     const recognitionRef = useRef<any>(null);
     const isMounted = useRef(true);
+    const interimRef = useRef(''); // Track interim for onend promotion
     const { toast } = useToast();
 
     // ─── Refs to avoid stale closures (Context7 — best practice) ───
@@ -128,7 +129,7 @@ export const useVoice = ({
     const continuousRef = useRef(continuous);
     const restartTimeoutRef = useRef<number | null>(null);
     const retryCountRef = useRef(0);
-    const MAX_RETRIES = 5;
+    const MAX_RETRIES = 10;
     const isStoppingRef = useRef(false); // Track intentional stops
 
     // Keep refs in sync with props
@@ -163,6 +164,7 @@ export const useVoice = ({
                 if (match) {
                     setIsProcessing(true);
                     setLastCommand(cmd.description || normalized);
+                    retryCountRef.current = 0; // Reset retry on successful match
                     cmd.callback(...match.slice(1));
                     if (cmd.description) {
                         toast({ title: 'Perintah Suara', description: cmd.description });
@@ -184,6 +186,7 @@ export const useVoice = ({
                     if (score >= (cmd.fuzzyThreshold ?? 0.7)) {
                         setIsProcessing(true);
                         setLastCommand(cmd.description || cmd.command);
+                        retryCountRef.current = 0; // Reset retry on successful match
                         cmd.callback(normalized, score);
                         if (cmd.description) {
                             toast({ title: 'Perintah Suara', description: cmd.description });
@@ -199,6 +202,7 @@ export const useVoice = ({
                 } else if (normalized.includes(cmdNorm)) {
                     setIsProcessing(true);
                     setLastCommand(cmd.description || cmd.command);
+                    retryCountRef.current = 0; // Reset retry on successful match
                     cmd.callback(normalized);
                     if (cmd.description) {
                         toast({ title: 'Perintah Suara', description: cmd.description });
@@ -224,12 +228,20 @@ export const useVoice = ({
             const matched = matchCommands(text);
             if (matched) {
                 setTranscript(''); // Clear to prevent re-processing
+            } else {
+                // ── Unmatched command feedback ──
+                toast({
+                    variant: 'destructive',
+                    title: 'Perintah Tidak Dikenali',
+                    description: `"${text.trim()}" — Coba: "ayat 5", "putar", "berhenti", atau "buka surah yasin".`,
+                });
+                setTranscript('');
             }
         } else {
             // Search mode — just pass through
             onTranscript?.(text);
         }
-    }, [mode, matchCommands, onTranscript]);
+    }, [mode, matchCommands, onTranscript, toast]);
 
     // ─── Debounced Processing ───
     useEffect(() => {
@@ -388,6 +400,7 @@ export const useVoice = ({
             }
 
             setInterimTranscript(interimTrans);
+            interimRef.current = interimTrans;
 
             if (finalTrans) {
                 // Reset retry counter on successful recognition
@@ -421,7 +434,11 @@ export const useVoice = ({
                 // Don't restart on fatal errors
                 isStoppingRef.current = true;
             }
-            // Silent errors (no-speech, aborted) — allow restart via onend
+            // Silent errors (no-speech, aborted) — expected during idle periods
+            // Reset retry count so these don't accumulate toward MAX_RETRIES
+            if (event.error === 'no-speech' || event.error === 'aborted') {
+                retryCountRef.current = 0;
+            }
         };
 
         // ─── onspeechstart / onspeechend (Context7 — detect active speech) ───
@@ -436,6 +453,23 @@ export const useVoice = ({
         recognition.onend = () => {
             if (isMounted.current) {
                 setIsSpeaking(false);
+                // Promote pending interim → final transcript
+                // Chrome continuous mode can end session before isFinal arrives
+                // Only promote on natural session end, NOT on manual stop (closing smart mode)
+                const pending = interimRef.current;
+                if (pending && !isStoppingRef.current) {
+                    if (mode === 'search') {
+                        setTranscript(prev => (prev + ' ' + pending).trim());
+                    } else {
+                        setTranscript(pending);
+                    }
+                    setInterimTranscript('');
+                    interimRef.current = '';
+                } else if (pending) {
+                    // Manual stop: clear stale interim without promoting
+                    setInterimTranscript('');
+                    interimRef.current = '';
+                }
             }
             // Schedule restart using refs (no stale closure)
             scheduleRestart();

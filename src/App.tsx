@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
+import { Toaster as RadixToaster } from '@/components/ui/toaster';
 import Layout from '@/components/Layout';
 import PrivateRoute from '@/components/PrivateRoute';
 import { AuthProvider } from '@/providers/auth-provider';
@@ -76,6 +77,7 @@ function App() {
                   </Routes>
                 </Suspense>
                 <Toaster />
+                <RadixToaster />
               </SmartReaderProvider>
             </GalleryProvider>
           </ActivitiesProvider>

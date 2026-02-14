@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { BookOpen, Search, Mic, X, Check, RefreshCw, MapPin, BookMarked, Loader2
 import { useSurahList, useRandomAyat } from '@/hooks/useQuran';
 import { useToast } from "@/hooks/use-toast";
 import { useVoice } from '@/hooks/useVoice';
-import { useQuranSearch, AyatSearchResult } from '@/hooks/useQuranSearch';
+import { useVectorSearch, VectorSearchResult } from '@/hooks/useVectorSearch';
 import { useFuseSearch } from '@/hooks/useFuseSearch';
 import type { Surat } from '@/types/quran';
 import {
@@ -36,8 +36,10 @@ const Qiraati: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<FilterType>('semua');
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isDataReady, setIsDataReady] = useState(false);
-  const [ayatResults, setAyatResults] = useState<AyatSearchResult[]>([]);
+  const [ayatResults, setAyatResults] = useState<VectorSearchResult[]>([]);
+  const [isVectorLoading, setIsVectorLoading] = useState(false);
   const [voiceSearchMode, setVoiceSearchMode] = useState<'surah' | 'ayat'>('surah');
+  const autoSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -57,13 +59,12 @@ const Qiraati: React.FC = () => {
     ignoreDiacritics: true,
   });
 
-  // Content Search (Phase 3)
-  const { search: searchAyat, isReady: isSearchReady, isIndexing, indexProgress, startIndexing } = useQuranSearch();
+  // Vector Search API (equran.id)
+  const { search: vectorSearch } = useVectorSearch();
 
   // Voice Search (unified hook — search mode)
   const {
     isListening,
-    isSpeaking,
     interimTranscript,
     fullTranscript,
     resetTranscript
@@ -105,47 +106,66 @@ const Qiraati: React.FC = () => {
     setFilteredSurahs(applyFilter(results, filter));
   }, [searchQuery, fuseSearch, allSurahs, applyFilter]);
 
-  // Voice command execution
-  const executeVoiceCommand = useCallback((text: string) => {
+  // Voice command execution (async — uses Vector Search API)
+  const executeVoiceCommand = useCallback(async (text: string) => {
     const lowerText = text.toLowerCase();
 
-    // ── Ayat search mode: always do content search ──
-    if (voiceSearchMode === 'ayat' && isSearchReady) {
+    // ── Guard: detect multiple surahs in surah mode ──
+    if (voiceSearchMode === 'surah') {
+      const multiPattern = /\b(dan|atau|sama)\b/i;
+      if (multiPattern.test(lowerText.replace(PREFIX_REGEX, '').trim())) {
+        toast({
+          variant: 'destructive',
+          title: 'Satu Surat Saja',
+          description: 'Silakan sebutkan satu nama surat saja. Contoh: "Surat Yasin" atau "Al-Mulk".',
+        });
+        return;
+      }
+    }
+
+    // ── Ayat search mode: semantic search via Vector API ──
+    if (voiceSearchMode === 'ayat') {
       const cleanQuery = lowerText.replace(/(?:cari\s+)?(?:ayat\s+)?(?:tentang\s+)?/, '').trim();
       if (!cleanQuery) return;
-      const results = searchAyat(cleanQuery);
-      if (results.length > 0) {
-        setAyatResults(results);
-        toast({ title: 'Pencarian Ayat', description: `${results.length} ayat ditemukan untuk "${cleanQuery}".` });
-      } else {
-        toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Tidak ditemukan ayat tentang "${cleanQuery}".` });
-      }
+      setIsVectorLoading(true);
+      try {
+        const results = await vectorSearch(cleanQuery, { tipe: ['ayat'], batas: 10, skorMin: 0.3 });
+        if (results.length > 0) {
+          setAyatResults(results);
+          toast({ title: '🔍 AI Vector Search', description: `${results.length} ayat ditemukan untuk "${cleanQuery}".` });
+        } else {
+          toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Tidak ditemukan ayat tentang "${cleanQuery}".` });
+        }
+      } catch { /* handled by hook */ }
+      setIsVectorLoading(false);
       return;
     }
 
     // ── Content search detection (surah mode fallback) ──
-    // Patterns: "cari ayat tentang X", "ayat tentang X", "cari tentang X"
     const contentMatch = lowerText.match(/(?:cari\s+)?(?:ayat\s+)?tentang\s+(.+)/);
-    if (contentMatch && isSearchReady) {
+    if (contentMatch) {
       const query = contentMatch[1].trim();
-      const results = searchAyat(query);
-      if (results.length > 0) {
-        setAyatResults(results);
-        toast({ title: 'Pencarian Ayat', description: `${results.length} ayat ditemukan untuk "${query}".` });
-      } else {
-        toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Tidak ditemukan ayat tentang "${query}".` });
-      }
+      setIsVectorLoading(true);
+      try {
+        const results = await vectorSearch(query, { tipe: ['ayat'], batas: 10, skorMin: 0.3 });
+        if (results.length > 0) {
+          setAyatResults(results);
+          toast({ title: '🔍 AI Vector Search', description: `${results.length} ayat ditemukan untuk "${query}".` });
+        } else {
+          toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Tidak ditemukan ayat tentang "${query}".` });
+        }
+      } catch { /* handled by hook */ }
+      setIsVectorLoading(false);
       return;
     }
 
+    // ── Surah + Ayat navigation ──
     const ayatMatch = lowerText.match(/(?:surat|surah)?\s*(.+?)\s+ayat\s+(\d+)/);
-
     if (ayatMatch) {
       const surahName = ayatMatch[1];
       const ayatNum = ayatMatch[2];
       const cleanName = removePrefixes(surahName);
       const results = fuseSearch(cleanName);
-
       if (results.length > 0) {
         setIsVoiceModalOpen(false);
         const targetSurah = results[0];
@@ -157,49 +177,50 @@ const Qiraati: React.FC = () => {
       }
     }
 
+    // ── Surah name search (Fuse.js for names) → always auto-navigate ──
     const cleanQuery = removePrefixes(text);
     const results = fuseSearch(cleanQuery);
-
     if (results.length > 0) {
-      if (text.includes('buka') || text.includes('baca')) {
-        setIsVoiceModalOpen(false);
-        navigate(`/qiraati/surat/${results[0].nomor}`);
-        toast({ title: "Membuka Surat", description: `${results[0].namaLatin}` });
-      } else {
-        setIsVoiceModalOpen(false);
-        setSearchQuery(text);
-        handleSearch(text);
-      }
+      setIsVoiceModalOpen(false);
+      navigate(`/qiraati/surat/${results[0].nomor}`);
+      toast({ title: "Membuka Surat", description: results[0].namaLatin });
     } else {
-      // Fallback: try content search if available
-      if (isSearchReady) {
-        const ayatFallback = searchAyat(cleanQuery);
-        if (ayatFallback.length > 0) {
-          setAyatResults(ayatFallback);
-          toast({ title: 'Pencarian Ayat', description: `${ayatFallback.length} ayat ditemukan.` });
-          return;
+      // Fallback: try Vector API semantic search
+      setIsVectorLoading(true);
+      try {
+        const vectorResults = await vectorSearch(cleanQuery, { batas: 5, skorMin: 0.3 });
+        if (vectorResults.length > 0) {
+          setAyatResults(vectorResults);
+          toast({ title: '🔍 AI Vector Search', description: `${vectorResults.length} hasil ditemukan.` });
+        } else {
+          toast({ variant: "destructive", title: "Tidak Ditemukan", description: `Tidak ada hasil untuk "${text}".` });
         }
-      }
-      toast({
-        variant: "destructive",
-        title: "Tidak Ditemukan",
-        description: `Tidak ada surat yang ditemukan untuk "${text}".`,
-      });
+      } catch { /* handled by hook */ }
+      setIsVectorLoading(false);
     }
-  }, [fuseSearch, navigate, toast, handleSearch, searchAyat, isSearchReady, voiceSearchMode]);
+  }, [fuseSearch, navigate, toast, vectorSearch, voiceSearchMode]);
 
-  // Debounce for voice — only fire after user stops speaking (onspeechend)
+  // Auto-search: execute after transcript stabilizes (2s debounce)
   useEffect(() => {
-    if (!isVoiceModalOpen || !fullTranscript) return;
-    // Gate: don't start timer while user is still speaking
-    if (isSpeaking) return;
-    // Additional guard: don't fire while interim results are pending
-    if (interimTranscript) return;
-    const timer = setTimeout(() => {
+    if (autoSearchRef.current) {
+      clearTimeout(autoSearchRef.current);
+      autoSearchRef.current = null;
+    }
+
+    if (!isVoiceModalOpen || !fullTranscript || interimTranscript) return;
+
+    autoSearchRef.current = setTimeout(() => {
+      autoSearchRef.current = null;
       if (fullTranscript.trim().length > 0) executeVoiceCommand(fullTranscript);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [fullTranscript, isSpeaking, interimTranscript, isVoiceModalOpen, executeVoiceCommand]);
+    }, 2000);
+
+    return () => {
+      if (autoSearchRef.current) {
+        clearTimeout(autoSearchRef.current);
+        autoSearchRef.current = null;
+      }
+    };
+  }, [fullTranscript, interimTranscript, isVoiceModalOpen, executeVoiceCommand]);
 
   // Modal → listen (handled by enabled prop in useVoice)
   useEffect(() => {
@@ -485,19 +506,16 @@ const Qiraati: React.FC = () => {
                 Cari Surah
               </button>
               <button
-                onClick={() => {
-                  setVoiceSearchMode('ayat');
-                  if (!isSearchReady && !isIndexing) startIndexing();
-                }}
+                onClick={() => { setVoiceSearchMode('ayat'); setAyatResults([]); }}
                 className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${voiceSearchMode === 'ayat' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   }`}
               >
-                Cari Ayat
+                🔍 Cari Ayat (AI)
               </button>
             </div>
             <div className="bg-muted p-4 rounded-lg min-h-[80px] flex items-center justify-center text-center">
               <p className="text-lg font-medium text-foreground">
-                {fullTranscript || "..."}
+                {interimTranscript || fullTranscript || "..."}
               </p>
             </div>
 
@@ -508,43 +526,51 @@ const Qiraati: React.FC = () => {
               <span className="bg-secondary px-2 py-1 rounded-md">"Cari ayat tentang sabar"</span>
             </div>
 
-            {/* Content Search Results */}
-            {ayatResults.length > 0 && (
-              <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
-                <p className="text-xs text-muted-foreground text-center font-medium">Hasil Pencarian Ayat ({ayatResults.length})</p>
-                {ayatResults.slice(0, 5).map((r) => (
-                  <button
-                    key={`${r.surahNomor}-${r.ayatNomor}`}
-                    onClick={() => {
-                      setIsVoiceModalOpen(false);
-                      setAyatResults([]);
-                      navigate(`/qiraati/surat/${r.surahNomor}#ayat-${r.ayatNomor}`, {
-                        state: { autoPlayAyat: r.ayatNomor }
-                      });
-                    }}
-                    className="w-full text-left p-3 rounded-lg border border-border/40 hover:border-emerald-500/50 bg-card hover:bg-card/80 transition-all"
-                  >
-                    <p className="text-xs text-emerald-500 font-medium">{r.surahNamaLatin} : {r.ayatNomor}</p>
-                    <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">{r.teksIndonesia}</p>
-                  </button>
-                ))}
+            {/* Vector Search Loading */}
+            {isVectorLoading && (
+              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-2">
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+                <span>Mencari dengan AI Vector Search...</span>
               </div>
             )}
 
-            {/* Indexing Progress */}
-            {isIndexing && (
-              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Membangun indeks pencarian ({indexProgress}%)
+            {/* Vector Search Results */}
+            {ayatResults.length > 0 && (
+              <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                <p className="text-xs text-muted-foreground text-center font-medium">🔍 Hasil AI Search ({ayatResults.length})</p>
+                {ayatResults.slice(0, 5).map((r, i) => (
+                  <button
+                    key={`${r.data.id_surat}-${r.data.nomor_ayat}-${i}`}
+                    onClick={() => {
+                      setIsVoiceModalOpen(false);
+                      setAyatResults([]);
+                      if (r.tipe === 'ayat' && r.data.id_surat) {
+                        navigate(`/qiraati/surat/${r.data.id_surat}${r.data.nomor_ayat ? `#ayat-${r.data.nomor_ayat}` : ''}`, {
+                          state: r.data.nomor_ayat ? { autoPlayAyat: r.data.nomor_ayat } : undefined
+                        });
+                      } else if (r.tipe === 'surat' && r.data.id_surat) {
+                        navigate(`/qiraati/surat/${r.data.id_surat}`);
+                      }
+                    }}
+                    className="w-full text-left p-3 rounded-lg border border-border/40 hover:border-emerald-500/50 bg-card hover:bg-card/80 transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-emerald-500 font-medium">
+                        {r.data.nama_surat}{r.data.nomor_ayat ? ` : ${r.data.nomor_ayat}` : ''}
+                      </p>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${r.relevansi === 'tinggi' ? 'bg-emerald-500/20 text-emerald-400' :
+                        r.relevansi === 'sedang' ? 'bg-yellow-500/20 text-yellow-400' :
+                          'bg-muted text-muted-foreground'
+                        }`}>
+                        {Math.round(r.skor * 100)}%
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
+                      {r.data.terjemahan_id || r.data.isi || r.data.deskripsi || r.data.arti_surat}
+                    </p>
+                  </button>
+                ))}
               </div>
-            )}
-            {!isSearchReady && !isIndexing && (
-              <button
-                onClick={startIndexing}
-                className="w-full text-xs text-emerald-500 hover:text-emerald-400 font-medium py-1"
-              >
-                Aktifkan pencarian ayat berdasarkan konten
-              </button>
             )}
           </div>
 
@@ -561,7 +587,7 @@ const Qiraati: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 };
 

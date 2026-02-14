@@ -34,6 +34,8 @@ import { useBookmarks } from '@/hooks/useBookmarks';
 import { useLastRead } from '@/hooks/useLastRead';
 import { useFaceScroll } from '@/hooks/useFaceScroll';
 import { useVoice, VoiceCommand } from '@/hooks/useVoice';
+import { useFuseSearch } from '@/hooks/useFuseSearch';
+import { useVectorSearch } from '@/hooks/useVectorSearch';
 import SmartReaderOverlay from '@/components/SmartReaderOverlay';
 import { useSmartReader } from '@/providers/SmartReaderHooks';
 import SurahSidebar from '@/components/SurahSidebar';
@@ -58,6 +60,21 @@ const SurahDetail: React.FC = () => {
   const { getAudioFull, getAudioAyat } = useAudioUrls();
   const { isBookmarked, toggleBookmark } = useBookmarks();
   const { updateLastRead } = useLastRead();
+
+  // Vector Search API (equran.id semantic search for smart mode)
+  const { search: vectorSearch } = useVectorSearch();
+
+  // Fuse Search for voice commands (navigate to other surahs directly)
+  const { search: fuseSearch } = useFuseSearch(allSurahs, {
+    keys: [
+      { name: 'nomor', weight: 1 },
+      { name: 'namaLatin', weight: 0.7 },
+      { name: 'nama', weight: 0.5 },
+      { name: 'arti', weight: 0.4 }
+    ],
+    threshold: 0.3,
+    ignoreDiacritics: true,
+  });
 
   // UI State
   const [isPlayingFull, setIsPlayingFull] = useState(false);
@@ -163,6 +180,16 @@ const SurahDetail: React.FC = () => {
   const playAyat = useCallback(async (ayatNumber: number) => {
     if (!surahData || !nomor) return;
 
+    // ─── Validate ayat number range ───
+    if (ayatNumber < 1 || ayatNumber > surahData.jumlahAyat) {
+      toast({
+        variant: 'destructive',
+        title: 'Ayat Tidak Ditemukan',
+        description: `Surat ${surahData.namaLatin} hanya memiliki ${surahData.jumlahAyat} ayat. Ayat ${ayatNumber} tidak tersedia.`,
+      });
+      return;
+    }
+
     // Stop full surah
     if (audioRef.current && isPlayingFull) {
       audioRef.current.pause();
@@ -195,11 +222,16 @@ const SurahDetail: React.FC = () => {
             updateLastRead(surahData.nomor, surahData.namaLatin, ayatNumber);
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Error playing ayat:', e);
+        toast({
+          variant: 'destructive',
+          title: 'Gagal Memutar Audio',
+          description: e?.message || 'Terjadi kesalahan saat memutar audio ayat.',
+        });
       }
     }
-  }, [surahData, nomor, isPlayingFull, playingAyat, selectedQari, getAudioAyat, updateLastRead]);
+  }, [surahData, nomor, isPlayingFull, playingAyat, selectedQari, getAudioAyat, updateLastRead, toast]);
 
   // ─── Stop all audio ───
   const stopAllAudio = useCallback(() => {
@@ -218,6 +250,15 @@ const SurahDetail: React.FC = () => {
   useEffect(() => {
     return () => stopAllAudio();
   }, [stopAllAudio]);
+
+  // ─── Auto-scroll to playing ayat ───
+  useEffect(() => {
+    if (playingAyat === null) return;
+    const el = document.getElementById(`ayat-${playingAyat}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [playingAyat]);
 
   // ─── Auto-play from navigation state ───
   const lastProcessedState = useRef<any>(null);
@@ -286,11 +327,13 @@ const SurahDetail: React.FC = () => {
   }, []);
 
   // ─── Smart Reader ───
-  const { videoRef, isReady: isFaceReady, error: faceError, debugRefs } = useFaceScroll({
+  const handleFaceScroll = useCallback((speed: number) => {
+    if (ayatListRef.current) ayatListRef.current.scrollTop += speed;
+  }, []);
+
+  const { videoRef, isReady: isFaceReady, error: faceError, isFaceLost, isTooClose, headPosition, debugRefs } = useFaceScroll({
     enabled: isSmartMode,
-    onScroll: (speed) => {
-      if (ayatListRef.current) ayatListRef.current.scrollTop += speed;
-    }
+    onScroll: handleFaceScroll,
   });
 
   // ─── Voice Commands Registry (Context7 — command pattern) ───
@@ -308,27 +351,45 @@ const SurahDetail: React.FC = () => {
     },
     // Open surah with ayat
     {
-      command: /(?:buka|putar|baca)?\s*(?:surah)?\s+(.+?)\s+ayat\s+(\d+)/, callback: (surahName: string, ayatStr: string) => {
-        stopAllAudio();
-        navigate(`/qiraati?voice_search=${encodeURIComponent(surahName)}&ayat=${ayatStr}`);
+      command: /(?:buka|putar|baca)?\s*(?:surat|surah)?\s+(.+?)\s+ayat\s+(\d+)/, callback: (surahName: string, ayatStr: string) => {
+        const results = fuseSearch(surahName.trim());
+        if (results.length > 0) {
+          stopAllAudio();
+          navigate(`/qiraati/surat/${results[0].nomor}#ayat-${ayatStr}`, {
+            state: { autoPlayAyat: parseInt(ayatStr) }
+          });
+          toast({ title: 'Membuka Surat', description: `${results[0].namaLatin} Ayat ${ayatStr}` });
+        } else {
+          toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Surat "${surahName}" tidak ditemukan.` });
+        }
       }, description: 'Membuka surah...'
     },
     // Open surah
     {
-      command: /(?:buka|putar|baca)?\s*(?:surah)\s+(.+)/, callback: (surahName: string) => {
-        if (!surahName.includes('ayat')) {
+      command: /(?:buka|putar|baca)?\s*(?:surat|surah)\s+(.+)/, callback: (surahName: string) => {
+        if (surahName.includes('ayat')) return;
+        const results = fuseSearch(surahName.trim());
+        if (results.length > 0) {
           stopAllAudio();
-          navigate(`/qiraati?voice_search=${encodeURIComponent(surahName)}`);
+          navigate(`/qiraati/surat/${results[0].nomor}`);
+          toast({ title: 'Membuka Surat', description: results[0].namaLatin });
+        } else {
+          toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Surat "${surahName}" tidak ditemukan.` });
         }
       }, description: 'Membuka surah...'
     },
     // Fallback "buka X"
     {
-      command: /^(?:buka|baca|cari)\s+(?!ayat)(.+)/, callback: (surahName: string) => {
+      command: /^(?:buka|baca)\s+(?!ayat)(.+)/, callback: (surahName: string) => {
         const clean = surahName.replace('surah', '').trim();
-        if (clean && !clean.includes('ayat')) {
+        if (!clean || clean.includes('ayat')) return;
+        const results = fuseSearch(clean);
+        if (results.length > 0) {
           stopAllAudio();
-          navigate(`/qiraati?voice_search=${encodeURIComponent(clean)}`);
+          navigate(`/qiraati/surat/${results[0].nomor}`);
+          toast({ title: 'Membuka Surat', description: results[0].namaLatin });
+        } else {
+          toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Surat "${clean}" tidak ditemukan.` });
         }
       }, description: 'Membuka surah...'
     },
@@ -426,13 +487,62 @@ const SurahDetail: React.FC = () => {
       }, description: 'Ayat dibagikan.'
     },
 
-  ], [playFullSurah, playAyat, stopAllAudio, navigate, openTafsir, fontSize, handleFontSizeChange, surahData, toggleBookmark, nextSurat, prevSurat, showTransliteration, showTranslation, copyAyat, shareAyat]);
+    // ── AI Vector Search (semantic ayat search) ──
+    {
+      command: /(?:cari|temukan|search)\s*(?:ayat\s+)?(?:tentang\s+)?(.+)/, callback: (query: string) => {
+        const clean = query.trim();
+        if (!clean || clean.length < 2) return;
+        toast({ title: '🔍 Mencari...', description: `AI Vector Search: "${clean}"` });
+        vectorSearch(clean, { tipe: ['ayat'], batas: 5, skorMin: 0.3 }).then(results => {
+          if (results.length > 0) {
+            const first = results[0];
+            const preview = first.data.terjemahan_id?.substring(0, 80) || '';
+            toast({
+              title: `🔍 ${first.data.nama_surat} : ${first.data.nomor_ayat}`,
+              description: `${preview}...`,
+            });
+            // Navigate to the first result
+            if (first.data.id_surat) {
+              stopAllAudio();
+              navigate(`/qiraati/surat/${first.data.id_surat}${first.data.nomor_ayat ? `#ayat-${first.data.nomor_ayat}` : ''}`, {
+                state: first.data.nomor_ayat ? { autoPlayAyat: first.data.nomor_ayat } : undefined
+              });
+            }
+          } else {
+            toast({ variant: 'destructive', title: 'Tidak Ditemukan', description: `Tidak ada ayat tentang "${clean}".` });
+          }
+        });
+      }, description: 'Mencari ayat...'
+    },
 
-  const { isListening, isProcessing, isSpeaking, lastCommand, error: voiceError, startListening: restartVoice } = useVoice({
+  ], [playFullSurah, playAyat, stopAllAudio, navigate, openTafsir, fontSize, handleFontSizeChange, surahData, toggleBookmark, nextSurat, prevSurat, showTransliteration, showTranslation, copyAyat, shareAyat, fuseSearch, toast, vectorSearch]);
+
+  // ─── Mute mic state ───
+  const [isMicMuted, setIsMicMuted] = useState(false);
+
+  const { isListening, isProcessing, isSpeaking, lastCommand, error: voiceError, startListening, stopListening } = useVoice({
     mode: 'command',
     commands: voiceCommands,
-    enabled: isSmartMode,
+    enabled: isSmartMode && !isMicMuted,
   });
+
+  const handleToggleMic = useCallback(() => {
+    setIsMicMuted(prev => {
+      if (!prev) {
+        // Muting — stop listening
+        stopListening();
+      } else {
+        // Unmuting — start listening
+        startListening();
+      }
+      return !prev;
+    });
+  }, [stopListening, startListening]);
+
+  // Reset mic mute when exiting smart mode
+  useEffect(() => {
+    if (!isSmartMode) setIsMicMuted(false);
+  }, [isSmartMode]);
 
   return (
     <div className="flex min-h-screen">
@@ -464,116 +574,122 @@ const SurahDetail: React.FC = () => {
         ) : surahData ? (
           <div className="p-4 md:p-6 space-y-4">
             {/* ── Surah Header ── */}
-            <div className="rounded-xl border border-border/30 bg-card p-5 md:p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full border-2 border-emerald-500 flex items-center justify-center">
-                    <span className="text-sm font-bold text-emerald-500">{surahData.nomor}</span>
+            {(
+              <div className="rounded-xl border border-border/30 bg-card p-5 md:p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full border-2 border-emerald-500 flex items-center justify-center">
+                      <span className="text-sm font-bold text-emerald-500">{surahData.nomor}</span>
+                    </div>
+                    <div>
+                      <h1 className="text-xl md:text-2xl font-bold text-foreground">
+                        {surahData.namaLatin}
+                        <span className="text-muted-foreground font-normal text-base ml-2">• {surahData.arti}</span>
+                      </h1>
+                      <p className="text-sm text-muted-foreground">
+                        ◉ {surahData.tempatTurun} • {surahData.jumlahAyat} Ayat
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-foreground">
-                      {surahData.namaLatin}
-                      <span className="text-muted-foreground font-normal text-base ml-2">• {surahData.arti}</span>
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                      ◉ {surahData.tempatTurun} • {surahData.jumlahAyat} Ayat
-                    </p>
-                  </div>
+                  <span className="font-arabic text-2xl md:text-3xl text-emerald-500 leading-none">
+                    {surahData.nama}
+                  </span>
                 </div>
-                <span className="font-arabic text-2xl md:text-3xl text-emerald-500 leading-none">
-                  {surahData.nama}
-                </span>
               </div>
-            </div>
+            )}
 
             {/* ── Controls Bar ── */}
-            <div className="rounded-xl border border-border/30 bg-card px-4 py-3 flex flex-wrap items-center gap-3 md:gap-4 text-sm">
-              {/* Qari Selector */}
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground hidden sm:inline">Qari:</span>
-                <Select value={selectedQari} onValueChange={(v) => { setSelectedQari(v); stopAllAudio(); }}>
-                  <SelectTrigger className="w-[180px] md:w-[220px] h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(qariMap).map(([qid, name]) => (
-                      <SelectItem key={qid} value={qid}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="hidden md:block w-px h-6 bg-border/50" />
-
-              {/* Transliteration Toggle */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-muted-foreground text-xs">ꦲ Transliterasi</span>
-                <Switch checked={showTransliteration} onCheckedChange={setShowTransliteration} />
-              </label>
-
-              {/* Translation Toggle */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-muted-foreground text-xs">T Terjemahan</span>
-                <Switch checked={showTranslation} onCheckedChange={setShowTranslation} />
-              </label>
-
-              <div className="hidden md:block w-px h-6 bg-border/50" />
-
-              {/* Play Full */}
-              <Button variant="ghost" size="sm" onClick={playFullSurah} className="text-emerald-500 hover:text-emerald-400">
-                {isPlayingFull ? <Pause className="w-4 h-4 mr-1" /> : <Play className="w-4 h-4 mr-1" />}
-                Play Audio Full
-              </Button>
-            </div>
-
-            {/* ── Font & Scroll Controls (collapsed) ── */}
-            <details className="rounded-xl border border-border/30 bg-card">
-              <summary className="px-4 py-3 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-                ⚙ Pengaturan Tampilan & Scroll
-              </summary>
-              <div className="px-4 pb-4 space-y-4">
-                {/* Font Size */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground min-w-[80px]">Font:</span>
-                  <Button variant="outline" size="icon" className="h-8 w-8"
-                    onClick={() => { const s: (typeof fontSize)[] = ['sm', 'md', 'lg', 'xl']; const i = s.indexOf(fontSize); if (i > 0) handleFontSizeChange(s[i - 1]); }}
-                    disabled={fontSize === 'sm'}>
-                    <Minus className="w-3 h-3" />
-                  </Button>
-                  <span className="text-sm text-foreground min-w-[70px] text-center">
-                    {{ sm: 'Kecil', md: 'Sedang', lg: 'Besar', xl: 'Sangat Besar' }[fontSize]}
-                  </span>
-                  <Button variant="outline" size="icon" className="h-8 w-8"
-                    onClick={() => { const s: (typeof fontSize)[] = ['sm', 'md', 'lg', 'xl']; const i = s.indexOf(fontSize); if (i < s.length - 1) handleFontSizeChange(s[i + 1]); }}
-                    disabled={fontSize === 'xl'}>
-                    <Plus className="w-3 h-3" />
-                  </Button>
+            {(
+              <div className="rounded-xl border border-border/30 bg-card px-4 py-3 flex flex-wrap items-center gap-3 md:gap-4 text-sm">
+                {/* Qari Selector */}
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground hidden sm:inline">Qari:</span>
+                  <Select value={selectedQari} onValueChange={(v) => { setSelectedQari(v); stopAllAudio(); }}>
+                    <SelectTrigger className="w-[180px] md:w-[220px] h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(qariMap).map(([qid, name]) => (
+                        <SelectItem key={qid} value={qid}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                {/* Auto Scroll */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground min-w-[80px]">Scroll:</span>
-                  <Button size="sm" variant={autoScroll ? 'default' : 'outline'} onClick={() => setAutoScroll(!autoScroll)}>
-                    <ScrollText className="w-3 h-3 mr-1" /> {autoScroll ? 'Stop' : 'Mulai'}
-                  </Button>
-                  {autoScroll && (
-                    <Button size="sm" variant="outline"
-                      onClick={() => { const sp: (typeof scrollSpeed)[] = ['slow', 'medium', 'fast']; setScrollSpeed(sp[(sp.indexOf(scrollSpeed) + 1) % 3]); }}>
-                      <FastForward className="w-3 h-3 mr-1" /> {scrollSpeed}
+
+                <div className="hidden md:block w-px h-6 bg-border/50" />
+
+                {/* Transliteration Toggle */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-muted-foreground text-xs">ꦲ Transliterasi</span>
+                  <Switch checked={showTransliteration} onCheckedChange={setShowTransliteration} />
+                </label>
+
+                {/* Translation Toggle */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-muted-foreground text-xs">T Terjemahan</span>
+                  <Switch checked={showTranslation} onCheckedChange={setShowTranslation} />
+                </label>
+
+                <div className="hidden md:block w-px h-6 bg-border/50" />
+
+                {/* Play Full */}
+                <Button variant="ghost" size="sm" onClick={playFullSurah} className="text-emerald-500 hover:text-emerald-400">
+                  {isPlayingFull ? <Pause className="w-4 h-4 mr-1" /> : <Play className="w-4 h-4 mr-1" />}
+                  Play Audio Full
+                </Button>
+              </div>
+            )}
+
+            {/* ── Font & Scroll Controls ── */}
+            {(
+              <details className="rounded-xl border border-border/30 bg-card">
+                <summary className="px-4 py-3 text-sm font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                  ⚙ Pengaturan Tampilan & Scroll
+                </summary>
+                <div className="px-4 pb-4 space-y-4">
+                  {/* Font Size */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground min-w-[80px]">Font:</span>
+                    <Button variant="outline" size="icon" className="h-8 w-8"
+                      onClick={() => { const s: (typeof fontSize)[] = ['sm', 'md', 'lg', 'xl']; const i = s.indexOf(fontSize); if (i > 0) handleFontSizeChange(s[i - 1]); }}
+                      disabled={fontSize === 'sm'}>
+                      <Minus className="w-3 h-3" />
                     </Button>
-                  )}
+                    <span className="text-sm text-foreground min-w-[70px] text-center">
+                      {{ sm: 'Kecil', md: 'Sedang', lg: 'Besar', xl: 'Sangat Besar' }[fontSize]}
+                    </span>
+                    <Button variant="outline" size="icon" className="h-8 w-8"
+                      onClick={() => { const s: (typeof fontSize)[] = ['sm', 'md', 'lg', 'xl']; const i = s.indexOf(fontSize); if (i < s.length - 1) handleFontSizeChange(s[i + 1]); }}
+                      disabled={fontSize === 'xl'}>
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  {/* Auto Scroll */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground min-w-[80px]">Scroll:</span>
+                    <Button size="sm" variant={autoScroll ? 'default' : 'outline'} onClick={() => setAutoScroll(!autoScroll)}>
+                      <ScrollText className="w-3 h-3 mr-1" /> {autoScroll ? 'Stop' : 'Mulai'}
+                    </Button>
+                    {autoScroll && (
+                      <Button size="sm" variant="outline"
+                        onClick={() => { const sp: (typeof scrollSpeed)[] = ['slow', 'medium', 'fast']; setScrollSpeed(sp[(sp.indexOf(scrollSpeed) + 1) % 3]); }}>
+                        <FastForward className="w-3 h-3 mr-1" /> {scrollSpeed}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="h-1 bg-secondary rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${scrollProgress}%` }} />
+                  </div>
+                  {/* Smart Reader */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-muted-foreground min-w-[80px]">Smart:</span>
+                    <Button size="sm" variant={isSmartMode ? 'default' : 'outline'} onClick={() => setIsSmartMode(!isSmartMode)}>
+                      <ScanFace className="w-3 h-3 mr-1" /> {isSmartMode ? 'Matikan' : 'Aktifkan'}
+                    </Button>
+                  </div>
                 </div>
-                <div className="h-1 bg-secondary rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${scrollProgress}%` }} />
-                </div>
-                {/* Smart Reader */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground min-w-[80px]">Smart:</span>
-                  <Button size="sm" variant={isSmartMode ? 'default' : 'outline'} onClick={() => setIsSmartMode(!isSmartMode)}>
-                    <ScanFace className="w-3 h-3 mr-1" /> {isSmartMode ? 'Matikan' : 'Aktifkan'}
-                  </Button>
-                </div>
-              </div>
-            </details>
+              </details>
+            )}
 
             {isSmartMode && (
               <SmartReaderOverlay
@@ -582,32 +698,48 @@ const SurahDetail: React.FC = () => {
                 isListening={isListening}
                 isSpeaking={isSpeaking}
                 isProcessing={isProcessing}
+                isFaceLost={isFaceLost}
+                isTooClose={isTooClose}
+                headPosition={headPosition}
                 lastCommand={lastCommand}
                 error={faceError || voiceError}
                 debugRefs={debugRefs}
                 onClose={() => setIsSmartMode(false)}
-                onRetry={restartVoice}
+                onRetry={startListening}
+                isMicMuted={isMicMuted}
+                onToggleMic={handleToggleMic}
+                surahName={surahData?.namaLatin}
               />
             )}
 
             {/* ── Ayat List ── */}
             <div
               ref={ayatListRef}
-              className="space-y-3 max-h-[calc(100vh-16rem)] overflow-y-auto scroll-smooth"
+              className="space-y-3 max-h-[calc(100vh-16rem)] overflow-y-auto scroll-smooth pb-20"
             >
               {surahData.ayat.map((ayat) => {
                 const bookmarked = isBookmarked(surahData.nomor, ayat.nomorAyat);
+                const isPlaying = playingAyat === ayat.nomorAyat;
 
                 return (
                   <div
                     key={ayat.nomorAyat}
                     id={`ayat-${ayat.nomorAyat}`}
-                    className="rounded-xl border border-border/30 bg-card p-4 md:p-5 transition-colors"
+                    className={[
+                      'transition-all duration-300 ease-in-out',
+                      'rounded-xl border p-4 md:p-5',
+                      isPlaying
+                        ? 'border-emerald-500/40 bg-emerald-500/5 border-l-2 border-l-emerald-500 shadow-sm shadow-emerald-500/10'
+                        : 'border-border/30 bg-card',
+                    ].join(' ')}
                   >
                     {/* Action row */}
                     <div className="flex items-center gap-1.5 mb-4">
                       {/* Ayat number */}
-                      <div className="w-8 h-8 rounded-full border-2 border-emerald-500/60 flex items-center justify-center mr-1">
+                      <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center mr-1 transition-all duration-300 ${isPlaying
+                        ? 'border-emerald-500 bg-emerald-500/15 animate-pulse'
+                        : 'border-emerald-500/60'
+                        }`}>
                         <span className="text-xs font-semibold text-emerald-500">{ayat.nomorAyat}</span>
                       </div>
                       {/* Play */}
@@ -668,30 +800,32 @@ const SurahDetail: React.FC = () => {
             </div>
 
             {/* ── Next/Prev Navigation ── */}
-            <div className="flex items-center justify-between pt-4">
-              {prevSurat ? (
-                <Button
-                  variant="outline"
-                  onClick={() => { stopAllAudio(); navigate(`/qiraati/surat/${prevSurat.nomor}`); }}
-                  className="flex items-center gap-2"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">{prevSurat.namaLatin}</span>
-                  <span className="sm:hidden">Sebelumnya</span>
-                </Button>
-              ) : <div />}
-              {nextSurat ? (
-                <Button
-                  variant="outline"
-                  onClick={() => { stopAllAudio(); navigate(`/qiraati/surat/${nextSurat.nomor}`); }}
-                  className="flex items-center gap-2"
-                >
-                  <span className="hidden sm:inline">{nextSurat.namaLatin}</span>
-                  <span className="sm:hidden">Selanjutnya</span>
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              ) : <div />}
-            </div>
+            {(
+              <div className="flex items-center justify-between pt-4">
+                {prevSurat ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => { stopAllAudio(); navigate(`/qiraati/surat/${prevSurat.nomor}`); }}
+                    className="flex items-center gap-2"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span className="hidden sm:inline">{prevSurat.namaLatin}</span>
+                    <span className="sm:hidden">Sebelumnya</span>
+                  </Button>
+                ) : <div />}
+                {nextSurat ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => { stopAllAudio(); navigate(`/qiraati/surat/${nextSurat.nomor}`); }}
+                    className="flex items-center gap-2"
+                  >
+                    <span className="hidden sm:inline">{nextSurat.namaLatin}</span>
+                    <span className="sm:hidden">Selanjutnya</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                ) : <div />}
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-16">

@@ -1,9 +1,23 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, type RefObject, type MutableRefObject } from 'react';
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
 interface UseFaceScrollProps {
     onScroll: (speed: number) => void;
     enabled: boolean;
+}
+
+interface UseFaceScrollReturn {
+    videoRef: RefObject<HTMLVideoElement>;
+    isReady: boolean;
+    error: string | null;
+    isFaceLost: boolean;
+    isTooClose: boolean;
+    /** Normalized head position: -1 (full up) to +1 (full down), 0 = neutral/deadzone */
+    headPosition: number;
+    debugRefs: {
+        ratio: MutableRefObject<number>;
+        speed: MutableRefObject<number>;
+    };
 }
 
 // ─── Mobile Detection ───
@@ -18,7 +32,7 @@ class EMASmooth {
     private value: number;
     private alpha: number;
 
-    constructor(alpha = 0.3, initialValue = 0.77) {
+    constructor(alpha = 0.15, initialValue = 0.5) {
         this.alpha = alpha;
         this.value = initialValue;
     }
@@ -28,16 +42,33 @@ class EMASmooth {
         return this.value;
     }
 
-    reset(value = 0.77) {
+    reset(value = 0.5) {
         this.value = value;
     }
 
     get current() { return this.value; }
 }
 
-export const useFaceScroll = ({ onScroll, enabled }: UseFaceScrollProps) => {
+// ─── Configuration Constants ───
+const CONFIG = {
+    CALIBRATION_COUNT: 20,
+    DEADZONE: 0.06,                    // Normalized Y threshold (docs: 0.05–0.1)
+    SENSITIVITY_MOBILE: 35,
+    SENSITIVITY_DESKTOP: 50,
+    EMA_ALPHA_MOBILE: 0.12,            // Smoother on mobile (docs: 0.1–0.2)
+    EMA_ALPHA_DESKTOP: 0.18,
+    FACE_LOST_TIMEOUT_MS: 1000,        // Auto-stop after 1s without face
+    Z_TOO_CLOSE_THRESHOLD: -0.06,      // Z-depth threshold for "too close" warning
+    BASE_SCROLL_SPEED: 1.5,            // Minimum speed when outside deadzone
+    MAX_SCROLL_SPEED: 25,              // Cap max scroll speed
+} as const;
+
+export const useFaceScroll = ({ onScroll, enabled }: UseFaceScrollProps): UseFaceScrollReturn => {
     const [isReady, setIsReady] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isFaceLost, setIsFaceLost] = useState(false);
+    const [isTooClose, setIsTooClose] = useState(false);
+    const [headPosition, setHeadPosition] = useState(0);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
@@ -47,25 +78,36 @@ export const useFaceScroll = ({ onScroll, enabled }: UseFaceScrollProps) => {
     const debugRatioRef = useRef<number>(0);
     const debugSpeedRef = useRef<number>(0);
 
+    // ─── Refs for mutable values (prevents stale closures & re-creation cascade) ───
+    const onScrollRef = useRef(onScroll);
+    const enabledRef = useRef(enabled);
+
+    // Keep refs in sync with props
+    useEffect(() => { onScrollRef.current = onScroll; }, [onScroll]);
+    useEffect(() => { enabledRef.current = enabled; }, [enabled]);
+
     // ─── Mobile Optimization Refs ───
     const isMobile = useRef(isMobileDevice());
-    const smoother = useRef(new EMASmooth(isMobile.current ? 0.2 : 0.35));
+    const smoother = useRef(new EMASmooth(
+        isMobile.current ? CONFIG.EMA_ALPHA_MOBILE : CONFIG.EMA_ALPHA_DESKTOP,
+        0.5
+    ));
     const lastDetectTimeRef = useRef<number>(0);
+
+    // ─── Nose-Tip Y Calibration ───
     const calibrationSamples = useRef<number[]>([]);
-    const neutralRatioRef = useRef<number>(0.77); // Default neutral
+    const yRefRef = useRef<number | null>(null);       // Neutral Y position
     const isCalibrated = useRef(false);
 
-    // Adaptive thresholds based on calibration
-    const thresholdsRef = useRef({
-        down: 0.60,
-        up: 0.95,
-    });
+    // ─── Face-Lost Tracking ───
+    const lastFaceSeenRef = useRef<number>(performance.now());
+    const faceLostTimerRef = useRef<number | null>(null);
 
     // ─── Frame Rate Control ───
-    // Mobile: ~12fps max for face detection, Desktop: ~20fps
-    const targetInterval = isMobile.current ? 83 : 50; // ms between frames
+    // Mobile: ~12fps, Desktop: ~20fps for face detection
+    const targetInterval = isMobile.current ? 83 : 50;
 
-    const initializeFaceLandmarker = async () => {
+    const initializeFaceLandmarker = useCallback(async () => {
         try {
             const filesetResolver = await FilesetResolver.forVisionTasks(
                 "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
@@ -79,21 +121,20 @@ export const useFaceScroll = ({ onScroll, enabled }: UseFaceScrollProps) => {
                         modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
                         delegate: "GPU"
                     },
-                    outputFaceBlendshapes: false, // Disable unused features — saves perf
-                    outputFacialTransformationMatrixes: true,
+                    outputFaceBlendshapes: false,
+                    outputFacialTransformationMatrixes: false, // Not needed for nose-tip Y
                     runningMode: "VIDEO",
                     numFaces: 1
                 });
             } catch (gpuErr) {
                 console.warn('GPU delegate failed, falling back to CPU:', gpuErr);
-                // CPU fallback for mobile devices without WebGPU
                 landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
                     baseOptions: {
                         modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
                         delegate: "CPU"
                     },
                     outputFaceBlendshapes: false,
-                    outputFacialTransformationMatrixes: true,
+                    outputFacialTransformationMatrixes: false,
                     runningMode: "VIDEO",
                     numFaces: 1
                 });
@@ -104,42 +145,54 @@ export const useFaceScroll = ({ onScroll, enabled }: UseFaceScrollProps) => {
             // Reset calibration for new session
             calibrationSamples.current = [];
             isCalibrated.current = false;
+            yRefRef.current = null;
         } catch (err: any) {
             console.error(err);
             setError("Gagal memuat model AI: " + err.message);
         }
-    };
+    }, []);
 
     // ─── Auto-Calibration ───
-    // Collects first N samples to determine user's neutral head position
-    const CALIBRATION_COUNT = 20;
-
-    const calibrate = useCallback((ratio: number) => {
+    // Collects first N samples of nose-tip Y to determine neutral position
+    const calibrate = useCallback((currentY: number) => {
         if (isCalibrated.current) return;
 
-        calibrationSamples.current.push(ratio);
+        calibrationSamples.current.push(currentY);
 
-        if (calibrationSamples.current.length >= CALIBRATION_COUNT) {
+        if (calibrationSamples.current.length >= CONFIG.CALIBRATION_COUNT) {
             // Calculate median as neutral (more robust than mean)
             const sorted = [...calibrationSamples.current].sort((a, b) => a - b);
             const median = sorted[Math.floor(sorted.length / 2)];
-            neutralRatioRef.current = median;
-
-            // Set thresholds relative to neutral
-            // Mobile needs wider dead-zone because of hand shake
-            const downOffset = isMobile.current ? 0.22 : 0.17;
-            const upOffset = isMobile.current ? 0.22 : 0.18;
-            thresholdsRef.current = {
-                down: median - downOffset,
-                up: median + upOffset,
-            };
-
+            yRefRef.current = median;
             isCalibrated.current = true;
             smoother.current.reset(median);
-            console.log(`Face scroll calibrated: neutral=${median.toFixed(3)}, down<${thresholdsRef.current.down.toFixed(3)}, up>${thresholdsRef.current.up.toFixed(3)}`);
+            console.log(`[FaceScroll] Calibrated: yRef=${median.toFixed(4)}, deadzone=±${CONFIG.DEADZONE}`);
         }
     }, []);
 
+    // ─── Face-Lost Handler ───
+    const handleFaceLost = useCallback(() => {
+        if (faceLostTimerRef.current !== null) return; // Already running
+
+        faceLostTimerRef.current = window.setTimeout(() => {
+            setIsFaceLost(true);
+            setHeadPosition(0);
+            debugSpeedRef.current = 0;
+            console.log('[FaceScroll] Face lost — auto-stop scroll');
+        }, CONFIG.FACE_LOST_TIMEOUT_MS);
+    }, []);
+
+    const handleFaceFound = useCallback(() => {
+        if (faceLostTimerRef.current !== null) {
+            clearTimeout(faceLostTimerRef.current);
+            faceLostTimerRef.current = null;
+        }
+        setIsFaceLost(false);
+        lastFaceSeenRef.current = performance.now();
+    }, []);
+
+    // ─── Detection Loop (STABLE — no mutable deps) ───
+    // Reads `enabledRef` and `onScrollRef` from refs to avoid re-creation
     const predictWebcam = useCallback(() => {
         const video = videoRef.current;
         const faceLandmarker = faceLandmarkerRef.current;
@@ -155,7 +208,7 @@ export const useFaceScroll = ({ onScroll, enabled }: UseFaceScrollProps) => {
         // ─── Frame Rate Throttle ───
         const now = performance.now();
         if (now - lastDetectTimeRef.current < targetInterval) {
-            if (enabled) requestRef.current = requestAnimationFrame(predictWebcam);
+            if (enabledRef.current) requestRef.current = requestAnimationFrame(predictWebcam);
             return;
         }
 
@@ -165,70 +218,93 @@ export const useFaceScroll = ({ onScroll, enabled }: UseFaceScrollProps) => {
 
             const results = faceLandmarker.detectForVideo(video, now);
 
-            if (results.facialTransformationMatrixes && results.facialTransformationMatrixes.length > 0) {
-                // Geometry-based Pitch Detection
+            if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+                // ─── Face Found ───
+                handleFaceFound();
+
                 const landmarks = results.faceLandmarks[0];
-                const nose = landmarks[1];
-                const chin = landmarks[152];
-                const forehead = landmarks[10];
+                const noseTip = landmarks[4]; // Landmark ID 4 — Nose Tip (per docs)
+                const currentY = noseTip.y;
 
-                const yNoseChin = Math.abs(chin.y - nose.y);
-                const yNoseForehead = Math.abs(nose.y - forehead.y);
-
-                const rawRatio = yNoseChin / yNoseForehead;
+                // ─── Z-Depth "Too Close" Check ───
+                const zDepth = noseTip.z;
+                setIsTooClose(zDepth < CONFIG.Z_TOO_CLOSE_THRESHOLD);
 
                 // ─── Auto-calibrate with first N frames ───
-                calibrate(rawRatio);
+                calibrate(currentY);
+
+                if (!isCalibrated.current || yRefRef.current === null) {
+                    // Still calibrating — skip scroll
+                    if (enabledRef.current) requestRef.current = requestAnimationFrame(predictWebcam);
+                    return;
+                }
 
                 // ─── EMA Smoothing ───
-                const ratio = smoother.current.update(rawRatio);
-                debugRatioRef.current = ratio;
+                const smoothedY = smoother.current.update(currentY);
+                const deltaY = smoothedY - yRefRef.current;
 
+                debugRatioRef.current = smoothedY;
+
+                // ─── Deadzone & Velocity Calculation ───
                 let speed = 0;
-                const { down: DOWN_TH, up: UP_TH } = thresholdsRef.current;
+                let normalizedPosition = 0; // For UI indicator
 
-                if (ratio < DOWN_TH) {
-                    // Looking DOWN -> Scroll Down (Positive speed)
-                    const intensity = (DOWN_TH - ratio) * 2;
-                    speed = 2 + (intensity * (isMobile.current ? 10 : 15));
-                } else if (ratio > UP_TH) {
-                    // Looking UP -> Scroll Up (Negative speed)
-                    const intensity = (ratio - UP_TH) * 2;
-                    speed = -(2 + (intensity * (isMobile.current ? 10 : 15)));
+                if (Math.abs(deltaY) > CONFIG.DEADZONE) {
+                    const direction = deltaY > 0 ? 1 : -1; // +1 = down, -1 = up
+                    const intensity = Math.abs(deltaY) - CONFIG.DEADZONE;
+                    const sensitivity = isMobile.current ? CONFIG.SENSITIVITY_MOBILE : CONFIG.SENSITIVITY_DESKTOP;
+
+                    speed = direction * Math.min(
+                        CONFIG.BASE_SCROLL_SPEED + (intensity * sensitivity),
+                        CONFIG.MAX_SCROLL_SPEED
+                    );
+
+                    // Normalized position for UI bar: map deltaY to -1..+1 range
+                    // Max useful deltaY is about 0.25, so scale accordingly
+                    normalizedPosition = Math.max(-1, Math.min(1, deltaY / 0.20));
+                } else {
+                    // In deadzone — position is proportional but scaled smaller
+                    normalizedPosition = (deltaY / CONFIG.DEADZONE) * 0.3;
                 }
 
                 debugSpeedRef.current = speed;
+                setHeadPosition(normalizedPosition);
 
                 if (speed !== 0) {
-                    onScroll(speed);
+                    onScrollRef.current(speed);
                 }
+            } else {
+                // ─── No Face Detected ───
+                handleFaceLost();
             }
         }
 
-        if (enabled) {
+        if (enabledRef.current) {
             requestRef.current = requestAnimationFrame(predictWebcam);
         }
-    }, [enabled, onScroll, calibrate, targetInterval]);
+    }, [calibrate, targetInterval, handleFaceFound, handleFaceLost]); // ← NO onScroll, NO enabled
 
+    // ─── Start Camera (STABLE — no predictWebcam dep) ───
     const startCamera = useCallback(async () => {
         if (!videoRef.current) return;
 
         try {
-            // ─── Adaptive Camera Resolution ───
             const mobile = isMobile.current;
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     width: mobile ? 320 : 640,
                     height: mobile ? 240 : 480,
                     facingMode: "user",
-                    // Lower framerate on mobile for battery
                     ...(mobile ? { frameRate: { ideal: 15, max: 20 } } : {})
                 }
             });
 
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
-                videoRef.current.addEventListener('loadeddata', predictWebcam);
+                // Use onloadeddata (assignment) instead of addEventListener to prevent stacking
+                videoRef.current.onloadeddata = () => {
+                    predictWebcam();
+                };
                 streamRef.current = stream;
             }
         } catch (err: any) {
@@ -237,6 +313,7 @@ export const useFaceScroll = ({ onScroll, enabled }: UseFaceScrollProps) => {
         }
     }, [predictWebcam]);
 
+    // ─── Initialize FaceLandmarker on mount ───
     useEffect(() => {
         initializeFaceLandmarker();
         return () => {
@@ -248,28 +325,55 @@ export const useFaceScroll = ({ onScroll, enabled }: UseFaceScrollProps) => {
                 faceLandmarkerRef.current.close();
                 faceLandmarkerRef.current = null;
             }
+            if (faceLostTimerRef.current !== null) {
+                clearTimeout(faceLostTimerRef.current);
+            }
         }
-    }, []);
+    }, [initializeFaceLandmarker]);
 
+    // ─── Start/Stop camera based on enabled + isReady ───
+    // Dependencies: only isReady and enabled (both primitive values).
+    // startCamera and predictWebcam are now stable — no need to include them.
     useEffect(() => {
         if (isReady && enabled) {
             // Reset calibration on re-enable
             calibrationSamples.current = [];
             isCalibrated.current = false;
-            smoother.current.reset(0.77);
+            yRefRef.current = null;
+            smoother.current.reset(0.5);
+            setIsFaceLost(false);
+            setIsTooClose(false);
+            setHeadPosition(0);
             startCamera();
-            requestRef.current = requestAnimationFrame(predictWebcam);
+            // Don't start rAF here — startCamera's onloadeddata will start it
         } else {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach(track => track.stop());
                 streamRef.current = null;
             }
+            if (videoRef.current) {
+                videoRef.current.onloadeddata = null;
+                videoRef.current.srcObject = null;
+            }
+            if (faceLostTimerRef.current !== null) {
+                clearTimeout(faceLostTimerRef.current);
+                faceLostTimerRef.current = null;
+            }
         }
         return () => {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
         }
-    }, [isReady, enabled, predictWebcam, startCamera]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isReady, enabled]);
 
-    return { videoRef, isReady, error, debugRefs: { ratio: debugRatioRef, speed: debugSpeedRef } };
+    return {
+        videoRef,
+        isReady,
+        error,
+        isFaceLost,
+        isTooClose,
+        headPosition,
+        debugRefs: { ratio: debugRatioRef, speed: debugSpeedRef },
+    };
 };
