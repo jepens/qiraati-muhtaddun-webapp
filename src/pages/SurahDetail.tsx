@@ -68,6 +68,7 @@ const SurahDetail: React.FC = () => {
 
   // UI State
   const [isPlayingFull, setIsPlayingFull] = useState(false);
+  const isPlayingFullRef = useRef(false);
   const [playingAyat, setPlayingAyat] = useState<number | null>(null);
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('md');
   const [isMuted] = useState(false);
@@ -89,6 +90,7 @@ const SurahDetail: React.FC = () => {
   const ayatListRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const ayatAudioRefs = useRef<Record<number, HTMLAudioElement>>({});
+  const tafsirContentRef = useRef<HTMLDivElement>(null);
 
   // Qari map for display
   const qariMap = useMemo(() => {
@@ -150,9 +152,11 @@ const SurahDetail: React.FC = () => {
   const playFullSurah = useCallback(async () => {
     if (!surahData || !nomor) return;
 
-    if (audioRef.current && isPlayingFull) {
+    // Use ref to avoid stale closure when called from gesture handler
+    if (audioRef.current && isPlayingFullRef.current) {
       audioRef.current.pause();
       setIsPlayingFull(false);
+      isPlayingFullRef.current = false;
       return;
     }
 
@@ -162,13 +166,14 @@ const SurahDetail: React.FC = () => {
         audioRef.current.src = url;
         audioRef.current.play().catch(console.error);
         setIsPlayingFull(true);
+        isPlayingFullRef.current = true;
         setPlayingAyat(null);
         Object.values(ayatAudioRefs.current).forEach((a) => a.pause());
       }
     } catch (e) {
       console.error('Error playing full surah:', e);
     }
-  }, [surahData, nomor, isPlayingFull, selectedQari, getAudioFull]);
+  }, [surahData, nomor, selectedQari, getAudioFull]);
 
   // ─── Audio: Per Ayat ───
   const playAyat = useCallback(async (ayatNumber: number) => {
@@ -185,9 +190,10 @@ const SurahDetail: React.FC = () => {
     }
 
     // Stop full surah
-    if (audioRef.current && isPlayingFull) {
+    if (audioRef.current && isPlayingFullRef.current) {
       audioRef.current.pause();
       setIsPlayingFull(false);
+      isPlayingFullRef.current = false;
     }
 
     // Stop other ayat
@@ -225,13 +231,14 @@ const SurahDetail: React.FC = () => {
         });
       }
     }
-  }, [surahData, nomor, isPlayingFull, playingAyat, selectedQari, getAudioAyat, updateLastRead, toast]);
+  }, [surahData, nomor, playingAyat, selectedQari, getAudioAyat, updateLastRead, toast]);
 
   // ─── Stop all audio ───
   const stopAllAudio = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
       setIsPlayingFull(false);
+      isPlayingFullRef.current = false;
     }
     setPlayingAyat(null);
     Object.values(ayatAudioRefs.current).forEach((a) => {
@@ -340,6 +347,10 @@ const SurahDetail: React.FC = () => {
     if (ayatListRef.current) ayatListRef.current.scrollTop += delta;
   }, []);
 
+  // Ref to always hold the latest playFullSurah — same pattern as searchWidgetRef for Victory
+  const playFullSurahRef = useRef(playFullSurah);
+  useEffect(() => { playFullSurahRef.current = playFullSurah; }, [playFullSurah]);
+
   const handleGesture = useCallback((gesture: string) => {
     switch (gesture) {
       case 'Victory':
@@ -351,11 +362,11 @@ const SurahDetail: React.FC = () => {
         }
         break;
       case 'Thumb_Up':
-        // Toggle play full surah audio
-        playFullSurah();
+        // Toggle play full surah audio — call via ref (same pattern as Victory)
+        playFullSurahRef.current();
         break;
     }
-  }, [playFullSurah]);
+  }, []);
 
   const {
     videoRef: handVideoRef,
@@ -367,11 +378,12 @@ const SurahDetail: React.FC = () => {
     isPinching,
     isGrabbing,
     isHandDetected,
+    scrollVelocity,
   } = useHandGesture({
     enabled: isSmartMode && isHandMode,
     onScroll: handleHandScroll,
     onGesture: handleGesture,
-    containerRef: ayatListRef,
+    containerRef: tafsirModalOpen ? tafsirContentRef : ayatListRef,
   });
 
   // Combined video ref — use the active one
@@ -439,7 +451,25 @@ const SurahDetail: React.FC = () => {
             )}
 
             {/* ── Controls Bar ── */}
-            <div className={`rounded-xl border border-border/30 bg-card px-4 py-3 flex flex-wrap items-center justify-center gap-3 md:gap-4 text-sm ${isSmartMode ? 'sticky top-0 z-50 shadow-lg backdrop-blur-sm bg-card/95 mx-auto max-w-fit' : ''}`}>
+            <div data-hand-controls="true" className={`rounded-xl border border-border/30 bg-card px-4 py-3 flex flex-wrap items-center justify-center gap-3 md:gap-4 text-sm ${isSmartMode ? 'sticky top-0 z-50 shadow-lg backdrop-blur-sm bg-card/95 mx-auto max-w-fit' : ''}`}>
+
+              {/* Prev Surah */}
+              {prevSurat && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex gap-1 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    stopAllAudio();
+                    navigate(`/qiraati/surat/${prevSurat.nomor}`);
+                    if (ayatListRef.current) ayatListRef.current.scrollTop = 0;
+                  }}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span className="hidden lg:inline text-xs">{prevSurat.namaLatin}</span>
+                </Button>
+              )}
+
               {/* Qari Selector */}
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground hidden sm:inline">Qari:</span>
@@ -476,6 +506,23 @@ const SurahDetail: React.FC = () => {
                 {isPlayingFull ? <Pause className="w-4 h-4 mr-1" /> : <Play className="w-4 h-4 mr-1" />}
                 Play Audio Full
               </Button>
+
+              {/* Next Surah */}
+              {nextSurat && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex gap-1 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    stopAllAudio();
+                    navigate(`/qiraati/surat/${nextSurat.nomor}`);
+                    if (ayatListRef.current) ayatListRef.current.scrollTop = 0;
+                  }}
+                >
+                  <span className="hidden lg:inline text-xs">{nextSurat.namaLatin}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              )}
             </div>
 
             {/* ── Font & Scroll Controls — hidden in Smart Mode ── */}
@@ -684,7 +731,7 @@ const SurahDetail: React.FC = () => {
 
       {/* ── Tafsir Modal ── */}
       <Dialog open={tafsirModalOpen} onOpenChange={(open) => { if (!open) closeTafsir(); }}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent ref={tafsirContentRef} className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <BookOpenText className="w-5 h-5 text-emerald-500" />
@@ -738,7 +785,7 @@ const SurahDetail: React.FC = () => {
       </Dialog>
 
       {/* Audio element */}
-      <audio ref={audioRef} onEnded={() => setIsPlayingFull(false)} muted={isMuted} />
+      <audio ref={audioRef} onEnded={() => { setIsPlayingFull(false); isPlayingFullRef.current = false; }} muted={isMuted} />
 
       {/* ── Smart Reader Overlay — floating widget ── */}
       {isSmartMode && (
@@ -767,6 +814,7 @@ const SurahDetail: React.FC = () => {
           isPinching={isPinching}
           isGrabbing={isGrabbing}
           isActive={isHandDetected}
+          scrollVelocity={scrollVelocity}
           onAyatPlay={(num) => playAyat(num)}
           onAyatBookmark={(num) => {
             if (surahData) toggleBookmark(surahData.nomor, surahData.namaLatin, num);

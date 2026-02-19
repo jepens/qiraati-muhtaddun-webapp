@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BookOpen, Clock, Users, Info, Image, LogIn, Gamepad2, Heart, Sparkles, LogOut, Bookmark } from 'lucide-react';
+import { Home, BookOpen, Clock, Users, Info, Image, LogIn, Gamepad2, Heart, Sparkles, LogOut, Bookmark, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -84,7 +84,7 @@ export const Navbar = () => {
 };
 
 const AuthButtons = () => {
-  const { user, signOut, isAuthenticated } = useAuth();
+  const { user, signOut, isAuthenticated, isAdmin } = useAuth();
 
   if (isAuthenticated && user) {
     return (
@@ -111,6 +111,17 @@ const AuthButtons = () => {
               <span>Bookmark</span>
             </Link>
           </DropdownMenuItem>
+          {isAdmin && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link to="/admin">
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  <span>Admin Dashboard</span>
+                </Link>
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive focus:text-destructive">
             <LogOut className="mr-2 h-4 w-4" />

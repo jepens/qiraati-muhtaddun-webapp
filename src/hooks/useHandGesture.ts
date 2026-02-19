@@ -37,6 +37,7 @@ export interface UseHandGestureReturn {
     isPinching: boolean;
     isGrabbing: boolean;
     isHandDetected: boolean;
+    scrollVelocity?: number;
 }
 
 // ─── EMA Smoothing ───
@@ -69,25 +70,27 @@ const CONFIG = {
     POINTER_EMA_ALPHA: 0.3,
 
     // Pinch detection (now used for click)
-    PINCH_THRESHOLD: 0.06,
-    PINCH_RELEASE_THRESHOLD: 0.08,
+    PINCH_THRESHOLD: 0.04,        // Reduced: fingers must be closer to pinch (was 0.06)
+    PINCH_RELEASE_THRESHOLD: 0.06, // Reduced: tighter release zone (was 0.08)
     PINCH_CLICK_COOLDOWN: 600, // ms between pinch clicks
 
-    // Grab scroll (Closed_Fist)
-    GRAB_SCROLL_SENSITIVITY: 3.5,
-    GRAB_SCROLL_DEADZONE: 0.012,
-    GRAB_SCROLL_EMA_ALPHA: 0.15, // Lower = smoother (less jitter)
-    GRAB_VELOCITY_DAMPING: 0.85, // Dampen velocity for smooth stops
 
     // Gesture cooldown (ms)
     GESTURE_COOLDOWNS: {
-        Open_Palm: 1000,
-        Thumb_Up: 1000,
-        Victory: 800,
+        Open_Palm: 1500,
+        Thumb_Up: 1200,  // Lower than Victory for snappy toggle
+        Victory: 2000,
     } as Record<string, number>,
 
-    // Gesture confidence
-    MIN_GESTURE_CONFIDENCE: 0.70,
+    // Per-gesture sensitivity config
+    // Thumb_Up scores lower confidence in MediaPipe's model vs Victory,
+    // so it needs a lower threshold and shorter hold to feel equally responsive.
+    GESTURE_SENSITIVITY: {
+        Thumb_Up: { confidence: 0.65, holdMs: 120 },
+        Victory: { confidence: 0.80, holdMs: 200 },
+        Open_Palm: { confidence: 0.80, holdMs: 200 },
+        _default: { confidence: 0.80, holdMs: 200 },
+    } as Record<string, { confidence: number; holdMs: number }>,
 
     // Hand lost timeout
     HAND_LOST_TIMEOUT_MS: 500,
@@ -97,6 +100,9 @@ const CONFIG = {
     CONNECTOR_COLOR: '#00CC00',
     LANDMARK_RADIUS: 3,
     CONNECTOR_LINE_WIDTH: 2,
+
+    // ─── AUTO-SCROLL DOWN (Grab = scroll down slowly) ───
+    GRAB_SCROLL_SPEED: 15.0,        // px per frame (~180px/sec at 60fps)
 } as const;
 
 export const useHandGesture = ({
@@ -128,28 +134,31 @@ export const useHandGesture = ({
     const onScrollRef = useRef(onScroll);
     const onPinchClickRef = useRef(onPinchClick);
     const enabledRef = useRef(enabled);
+    const containerRefInternal = useRef(containerRef);
 
     useEffect(() => { onGestureRef.current = onGesture; }, [onGesture]);
     useEffect(() => { onScrollRef.current = onScroll; }, [onScroll]);
     useEffect(() => { onPinchClickRef.current = onPinchClick; }, [onPinchClick]);
     useEffect(() => { enabledRef.current = enabled; }, [enabled]);
+    useEffect(() => { containerRefInternal.current = containerRef; }, [containerRef]);
 
     // Smoothing
     const pointerEmaX = useRef(new EMA(CONFIG.POINTER_EMA_ALPHA));
     const pointerEmaY = useRef(new EMA(CONFIG.POINTER_EMA_ALPHA));
 
-    // Grab scroll state
+    // Auto-scroll state
     const isGrabbingRef = useRef(false);
-    const grabStartYRef = useRef<number>(0);
-    const grabScrollEma = useRef(new EMA(CONFIG.GRAB_SCROLL_EMA_ALPHA));
-    const grabVelocityRef = useRef(0);
+    const autoScrollAnimRef = useRef<number | null>(null); // rAF ID for auto-scroll
+    const [scrollVelocity, setScrollVelocity] = useState(0);
 
     // Pinch click state
     const isPinchingRef = useRef(false);
     const lastPinchClickTimeRef = useRef(0);
 
-    // Gesture cooldown
+    // Gesture cooldown & Debounce
     const lastGestureTimeRef = useRef<Map<string, number>>(new Map());
+    const gestureHoldStartRef = useRef<number>(0);
+    const lastRawGestureRef = useRef<HandGestureName>('None');
 
     // Hand lost tracking
     const lastHandSeenRef = useRef<number>(performance.now());
@@ -172,9 +181,9 @@ export const useHandGesture = ({
                 },
                 runningMode: 'VIDEO' as const,
                 numHands: 1,
-                minHandDetectionConfidence: 0.7,
-                minHandPresenceConfidence: 0.6,
-                minTrackingConfidence: 0.5,
+                minHandDetectionConfidence: 0.75, // Increased base detection confidence
+                minHandPresenceConfidence: 0.7,
+                minTrackingConfidence: 0.6,
             };
 
             // Try GPU first, fallback to CPU
@@ -249,35 +258,43 @@ export const useHandGesture = ({
         }
     }, []);
 
-    // ─── Grab scroll (Closed_Fist) ───
-    const processGrabScroll = useCallback((landmarks: { x: number; y: number; z: number }[]) => {
-        // Use wrist (landmark 0) Y for stable scroll tracking
-        const wristY = landmarks[0].y;
-
-        if (!isGrabbingRef.current) return;
-
-        const deltaY = wristY - grabStartYRef.current;
-
-        if (Math.abs(deltaY) > CONFIG.GRAB_SCROLL_DEADZONE) {
-            // Triple-stage smoothing:
-            // 1. EMA on raw delta
-            const smoothedDelta = grabScrollEma.current.update(deltaY);
-            // 2. Velocity dampening to reduce jitter
-            const rawVelocity = smoothedDelta * CONFIG.GRAB_SCROLL_SENSITIVITY * window.innerHeight;
-            grabVelocityRef.current = grabVelocityRef.current * CONFIG.GRAB_VELOCITY_DAMPING
-                + rawVelocity * (1 - CONFIG.GRAB_VELOCITY_DAMPING);
-            // 3. Apply smoothed velocity
-            const scrollAmount = grabVelocityRef.current * 0.3;
-
-            if (containerRef?.current) {
-                containerRef.current.scrollTop += scrollAmount;
-            }
-            onScrollRef.current?.(scrollAmount);
+    // ─── Auto-Scroll Down (Closed_Fist = scroll down slowly) ───
+    const startAutoScroll = useCallback(() => {
+        // Cancel any existing animation
+        if (autoScrollAnimRef.current) {
+            cancelAnimationFrame(autoScrollAnimRef.current);
         }
 
-        // Slowly drift start position towards current for continuous scrolling
-        grabStartYRef.current = grabStartYRef.current * 0.93 + wristY * 0.07;
-    }, [containerRef]);
+        const speed = CONFIG.GRAB_SCROLL_SPEED;
+
+        const tick = () => {
+            if (!isGrabbingRef.current) {
+                // Grab ended, stop scrolling
+                autoScrollAnimRef.current = null;
+                setScrollVelocity(0);
+                return;
+            }
+
+            // Scroll down at constant speed
+            if (containerRefInternal.current?.current) {
+                containerRefInternal.current.current.scrollTop += speed;
+            }
+            onScrollRef.current?.(speed);
+            setScrollVelocity(speed);
+
+            autoScrollAnimRef.current = requestAnimationFrame(tick);
+        };
+
+        autoScrollAnimRef.current = requestAnimationFrame(tick);
+    }, []);
+
+    const stopAutoScroll = useCallback(() => {
+        if (autoScrollAnimRef.current) {
+            cancelAnimationFrame(autoScrollAnimRef.current);
+            autoScrollAnimRef.current = null;
+        }
+        setScrollVelocity(0);
+    }, []);
 
     // ─── Draw hand landmarks on canvas ───
     const drawHandLandmarks = useCallback((landmarks: NormalizedLandmark[]) => {
@@ -387,26 +404,52 @@ export const useHandGesture = ({
                 // ── Process gesture ──
                 if (result.gestures.length > 0) {
                     const topGesture = result.gestures[0][0];
-                    const gestureName = topGesture.categoryName as HandGestureName;
+                    const rawGestureName = topGesture.categoryName as HandGestureName;
                     const confidence = topGesture.score;
 
-                    // Handle Closed_Fist (grab) → scroll
-                    if (gestureName === 'Closed_Fist' && confidence >= CONFIG.MIN_GESTURE_CONFIDENCE) {
+                    // ─── DEBOUNCE / HOLD LOGIC (per-gesture sensitivity) ───
+                    const gestureSens = CONFIG.GESTURE_SENSITIVITY[rawGestureName]
+                        || CONFIG.GESTURE_SENSITIVITY._default;
+                    const minConfidence = gestureSens.confidence;
+                    const holdRequired = gestureSens.holdMs;
+
+                    // Only process result if confidence meets per-gesture threshold
+                    if (confidence >= minConfidence) {
+                        // If gesture changed from last frame's raw gesture
+                        if (rawGestureName !== lastRawGestureRef.current) {
+                            lastRawGestureRef.current = rawGestureName;
+                            gestureHoldStartRef.current = now;
+                        }
+                    } else {
+                        // Low confidence -> treat as "None" or reset hold
+                        if (lastRawGestureRef.current !== 'None') {
+                            lastRawGestureRef.current = 'None';
+                            gestureHoldStartRef.current = now;
+                        }
+                    }
+
+                    // Check if held long enough (using per-gesture hold duration)
+                    const holdDuration = now - gestureHoldStartRef.current;
+                    const isStableGesture = holdDuration >= holdRequired;
+
+                    const activeGesture = isStableGesture ? lastRawGestureRef.current : 'None';
+                    // ─────────────────────────────
+
+                    // Handle Closed_Fist (grab) → auto-scroll down
+                    if (activeGesture === 'Closed_Fist') {
                         if (!isGrabbingRef.current) {
-                            // Grab START
+                            // Grab START — begin auto-scrolling down
                             isGrabbingRef.current = true;
-                            grabStartYRef.current = landmarks[0].y;
-                            grabScrollEma.current.reset(0);
-                            grabVelocityRef.current = 0;
                             setIsGrabbing(true);
                             setGesture('Closed_Fist');
+                            startAutoScroll();
                         }
-                        processGrabScroll(landmarks);
+                        // No per-frame processing needed — auto-scroll runs in its own rAF loop
                     } else {
-                        // End grab if it was active
+                        // End grab → stop auto-scroll
                         if (isGrabbingRef.current) {
                             isGrabbingRef.current = false;
-                            grabVelocityRef.current = 0;
+                            stopAutoScroll();
                             setIsGrabbing(false);
                         }
 
@@ -416,19 +459,18 @@ export const useHandGesture = ({
                         // Process other gestures (only when not pinching)
                         if (
                             !isPinchingRef.current &&
-                            gestureName !== 'None' &&
-                            confidence >= CONFIG.MIN_GESTURE_CONFIDENCE &&
-                            !isGestureOnCooldown(gestureName)
+                            activeGesture !== 'None' &&
+                            !isGestureOnCooldown(activeGesture)
                         ) {
                             const recognized: HandGestureName[] = [
                                 'Open_Palm', 'Thumb_Up', 'Victory'
                             ];
-                            if (recognized.includes(gestureName)) {
-                                setGesture(gestureName);
-                                lastGestureTimeRef.current.set(gestureName, now);
-                                onGestureRef.current?.(gestureName);
+                            if (recognized.includes(activeGesture)) {
+                                setGesture(activeGesture);
+                                lastGestureTimeRef.current.set(activeGesture, now);
+                                onGestureRef.current?.(activeGesture);
                             }
-                        } else if (gestureName === 'None') {
+                        } else if (activeGesture === 'None') {
                             setGesture('None');
                         }
                     }
@@ -443,10 +485,10 @@ export const useHandGesture = ({
 
                 setPointer(null);
 
-                // End grab if active
+                // End grab if active (stop auto-scroll)
                 if (isGrabbingRef.current) {
                     isGrabbingRef.current = false;
-                    grabVelocityRef.current = 0;
+                    stopAutoScroll();
                     setIsGrabbing(false);
                 }
 
@@ -457,6 +499,7 @@ export const useHandGesture = ({
                         setIsPinching(false);
                         isPinchingRef.current = false;
                         handLostTimerRef.current = null;
+                        lastRawGestureRef.current = 'None';
                     }, CONFIG.HAND_LOST_TIMEOUT_MS);
                 }
             }
@@ -467,7 +510,7 @@ export const useHandGesture = ({
         if (enabledRef.current) {
             requestRef.current = requestAnimationFrame(predictWebcam);
         }
-    }, [detectPinch, processGrabScroll, drawHandLandmarks, isGestureOnCooldown]);
+    }, [detectPinch, startAutoScroll, stopAutoScroll, drawHandLandmarks, isGestureOnCooldown]);
 
     // ─── Start Camera ───
     const startCamera = useCallback(async () => {
@@ -524,11 +567,13 @@ export const useHandGesture = ({
             setIsHandDetected(false);
             isPinchingRef.current = false;
             isGrabbingRef.current = false;
-            grabVelocityRef.current = 0;
+            stopAutoScroll();
+            setScrollVelocity(0);
             pointerEmaX.current.reset(0.5);
             pointerEmaY.current.reset(0.5);
-            grabScrollEma.current.reset(0);
             lastGestureTimeRef.current.clear();
+            lastRawGestureRef.current = 'None';
+            gestureHoldStartRef.current = 0;
 
             // Re-init DrawingUtils if needed
             if (!drawingUtilsRef.current && canvasRef.current) {
@@ -573,5 +618,7 @@ export const useHandGesture = ({
         isPinching,
         isGrabbing,
         isHandDetected,
+        scrollVelocity, // Expose for UI trail feedback
     };
 };
+

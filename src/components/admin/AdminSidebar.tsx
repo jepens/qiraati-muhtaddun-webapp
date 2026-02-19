@@ -10,6 +10,7 @@ import {
     Settings,
     LogOut,
     Landmark,
+    Users,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -77,6 +78,11 @@ const navSystem = [
         title: 'Pengaturan',
         path: '/admin/pengaturan',
         icon: Settings,
+    },
+    {
+        title: 'Users',
+        path: '/admin/users',
+        icon: Users,
     },
 ];
 

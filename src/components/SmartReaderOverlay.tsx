@@ -139,7 +139,7 @@ const SmartReaderOverlay: React.FC<SmartReaderOverlayProps> = ({
             {/* ── SINGLE Floating Widget container ── */}
             <div
                 className={`
-                    fixed z-50 right-4 transition-all duration-300 ease-out
+                    fixed z-50 right-24 transition-all duration-300 ease-out
                     bg-background/95 backdrop-blur-md shadow-2xl border border-primary/20
                     ${isExpanded
                         ? 'w-36 sm:w-40 rounded-xl p-2'

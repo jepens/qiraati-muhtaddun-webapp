@@ -3,6 +3,8 @@ import type { User } from '@supabase/supabase-js';
 
 export interface AuthContextType {
     user: User | null;
+    role: 'admin' | 'user' | null;
+    isAdmin: boolean;
     isLoading: boolean;
     error: string | null;
     signIn: (email: string, password: string) => Promise<void>;

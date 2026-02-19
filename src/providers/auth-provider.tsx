@@ -9,22 +9,55 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [role, setRole] = useState<'admin' | 'user' | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const fetchRole = async (userId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', userId)
+                .single();
+
+            if (error) {
+                console.error('Error fetching role:', error);
+                return;
+            }
+            if (data) {
+                setRole(data.role as 'admin' | 'user');
+            }
+        } catch (err) {
+            console.error('Error fetching role failed:', err);
+        }
+    };
+
     useEffect(() => {
         // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        const initSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
             setUser(session?.user ?? null);
+            if (session?.user) {
+                await fetchRole(session.user.id);
+            }
             setIsLoading(false);
-        });
+        };
+        initSession();
 
         // Listen for auth changes
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange((_event, session) => {
+        } = supabase.auth.onAuthStateChange(async (_event, session) => {
             setUser(session?.user ?? null);
-            setIsLoading(false);
+            if (session?.user) {
+                setIsLoading(true);
+                await fetchRole(session.user.id);
+                setIsLoading(false);
+            } else {
+                setRole(null);
+                setIsLoading(false);
+            }
         });
 
         return () => subscription.unsubscribe();
@@ -72,6 +105,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setError(null);
             const { error: signOutError } = await supabase.auth.signOut();
             if (signOutError) throw signOutError;
+            setRole(null);
         } catch (err) {
             console.error('Error signing out:', err);
             setError('Failed to sign out');
@@ -81,6 +115,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const value = {
         user,
+        role,
+        isAdmin: role === 'admin',
         isLoading,
         error,
         signIn,

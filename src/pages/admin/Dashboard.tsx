@@ -10,6 +10,7 @@ import AdminGaleri from './Galeri';
 import AdminTentangKami from './TentangKami';
 import AdminMonitoring from './Monitoring';
 import Pengaturan from './Pengaturan';
+import UserManagement from './UserManagement';
 
 const Dashboard: React.FC = () => {
   return (
@@ -26,6 +27,7 @@ const Dashboard: React.FC = () => {
             <Route path="tentang-kami" element={<AdminTentangKami />} />
             <Route path="monitoring" element={<AdminMonitoring />} />
             <Route path="pengaturan" element={<Pengaturan />} />
+            <Route path="users" element={<UserManagement />} />
           </Routes>
         </div>
       </SidebarInset>

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
 import { Toaster as RadixToaster } from '@/components/ui/toaster';
 import Layout from '@/components/Layout';
-import PrivateRoute from '@/components/PrivateRoute';
+import AdminRoute from '@/components/AdminRoute';
 import { AuthProvider } from '@/providers/auth-provider';
 import { ActivitiesProvider } from '@/providers/activities-provider';
 import { GalleryProvider } from '@/providers/gallery-provider';
@@ -69,9 +69,9 @@ function App() {
                     <Route
                       path="/admin/*"
                       element={
-                        <PrivateRoute>
+                        <AdminRoute>
                           <Dashboard />
-                        </PrivateRoute>
+                        </AdminRoute>
                       }
                     />
                   </Routes>

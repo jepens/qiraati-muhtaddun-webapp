@@ -28,6 +28,7 @@ import {
     RefreshCw,
     Users,
 } from 'lucide-react';
+import LoginRequiredDialog from '@/components/LoginRequiredDialog';
 import type { Surat } from '@/types/quran';
 
 interface Question {
@@ -75,6 +76,7 @@ const TebakAyat: React.FC = () => {
     const [maxStreak, setMaxStreak] = useState(0);
     const [currentStreak, setCurrentStreak] = useState(0);
     const [loadingQuestions, setLoadingQuestions] = useState(false);
+    const [showLoginDialog, setShowLoginDialog] = useState(false);
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -159,6 +161,11 @@ const TebakAyat: React.FC = () => {
 
     // Start game
     const startGame = async () => {
+        if (!user) {
+            setShowLoginDialog(true);
+            return;
+        }
+
         await generateQuestions();
         setGameState('playing');
         setCurrentIndex(0);
@@ -598,8 +605,8 @@ const TebakAyat: React.FC = () => {
                                         <Card
                                             key={entry.user_id}
                                             className={`border shadow-md transition-all duration-200 ${isCurrentUser
-                                                    ? 'bg-emerald-500/5 border-emerald-500/40 ring-1 ring-emerald-500/20'
-                                                    : 'bg-card/50 border-border hover:bg-card/70'
+                                                ? 'bg-emerald-500/5 border-emerald-500/40 ring-1 ring-emerald-500/20'
+                                                : 'bg-card/50 border-border hover:bg-card/70'
                                                 }`}
                                         >
                                             <CardContent className="p-4 flex items-center gap-4">
@@ -629,8 +636,8 @@ const TebakAyat: React.FC = () => {
                                                 {/* Accuracy */}
                                                 <div className="text-right">
                                                     <div className={`text-lg font-bold ${avgAccuracy >= 80 ? 'text-emerald-400' :
-                                                            avgAccuracy >= 60 ? 'text-yellow-400' :
-                                                                avgAccuracy >= 40 ? 'text-orange-400' : 'text-red-400'
+                                                        avgAccuracy >= 60 ? 'text-yellow-400' :
+                                                            avgAccuracy >= 40 ? 'text-orange-400' : 'text-red-400'
                                                         }`}>
                                                         {avgAccuracy}%
                                                     </div>
@@ -643,6 +650,11 @@ const TebakAyat: React.FC = () => {
                             </div>
                         )}
                     </div>
+
+                    <LoginRequiredDialog
+                        open={showLoginDialog}
+                        onOpenChange={setShowLoginDialog}
+                    />
                 </div>
             </div>
         );

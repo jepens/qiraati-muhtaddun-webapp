@@ -21,6 +21,7 @@ import {
     RefreshCw,
     Users,
 } from 'lucide-react';
+import LoginRequiredDialog from '@/components/LoginRequiredDialog';
 
 interface MemoryCardData {
     id: number;
@@ -45,6 +46,7 @@ const MemoryCard: React.FC = () => {
     const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
     const [gameState, setGameState] = useState<'menu' | 'playing' | 'paused' | 'gameOver'>('menu');
     const [cards, setCards] = useState<MemoryCardData[]>([]);
+    const [showLoginDialog, setShowLoginDialog] = useState(false);
     const [flippedCards, setFlippedCards] = useState<number[]>([]);
     const [matchedPairs, setMatchedPairs] = useState<number>(0);
     const [stats, setStats] = useState<GameStats>({
@@ -125,6 +127,11 @@ const MemoryCard: React.FC = () => {
 
     // Start game
     const startGame = () => {
+        if (!user) {
+            setShowLoginDialog(true);
+            return;
+        }
+
         generateCards();
         setGameState('playing');
         setStats({ score: 0, moves: 0, time: 0, streak: 0, maxStreak: 0 });
@@ -501,8 +508,8 @@ const MemoryCard: React.FC = () => {
                                             <Card
                                                 key={entry.user_id}
                                                 className={`border shadow-md transition-all duration-200 ${isCurrentUser
-                                                        ? 'bg-blue-500/5 border-blue-500/40 ring-1 ring-blue-500/20'
-                                                        : 'bg-card/50 border-border hover:bg-card/70'
+                                                    ? 'bg-blue-500/5 border-blue-500/40 ring-1 ring-blue-500/20'
+                                                    : 'bg-card/50 border-border hover:bg-card/70'
                                                     }`}
                                             >
                                                 <CardContent className="p-4 flex items-center gap-4">
@@ -527,8 +534,8 @@ const MemoryCard: React.FC = () => {
                                                     </div>
                                                     <div className="text-right">
                                                         <div className={`text-lg font-bold ${avgAccuracy >= 80 ? 'text-emerald-400' :
-                                                                avgAccuracy >= 60 ? 'text-yellow-400' :
-                                                                    avgAccuracy >= 40 ? 'text-orange-400' : 'text-red-400'
+                                                            avgAccuracy >= 60 ? 'text-yellow-400' :
+                                                                avgAccuracy >= 40 ? 'text-orange-400' : 'text-red-400'
                                                             }`}>
                                                             {avgAccuracy}%
                                                         </div>
@@ -542,6 +549,11 @@ const MemoryCard: React.FC = () => {
                             )}
                         </div>
                     </div>
+
+                    <LoginRequiredDialog
+                        open={showLoginDialog}
+                        onOpenChange={setShowLoginDialog}
+                    />
                 </div>
             </div>
         );

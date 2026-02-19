@@ -117,7 +117,7 @@ const SmartModeOnboarding: React.FC<SmartModeOnboardingProps> = ({
                         ) : (
                             <Hand className="w-5 h-5 text-violet-500" />
                         )}
-                        Smart Mode — {isMobileDevice ? 'Head Gesture' : 'Hand Gesture'}
+                        Smart Mode <span className="ml-1 text-[10px] bg-amber-500/20 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/30">BETA</span> — {isMobileDevice ? 'Head Gesture' : 'Hand Gesture'}
                     </DrawerTitle>
                     <DrawerDescription className="text-xs">
                         {step === 0 && 'Fitur baca Al-Quran tanpa sentuh layar'}
@@ -142,7 +142,7 @@ const SmartModeOnboarding: React.FC<SmartModeOnboardingProps> = ({
                                 Smart Mode memungkinkan Anda membaca Al-Quran <strong className="text-foreground">tanpa menyentuh layar</strong>.
                                 {' '}{isMobileDevice
                                     ? 'Cukup gerakkan kepala untuk scroll halaman.'
-                                    : 'Gunakan tangan untuk mengontrol pointer, scroll, dan aksi lainnya.'
+                                    : 'Gunakan tangan untuk mengontrol pointer, klik, scroll, dan kontrol audio.'
                                 }
                             </p>
 
@@ -153,16 +153,16 @@ const SmartModeOnboarding: React.FC<SmartModeOnboardingProps> = ({
                                     { icon: ArrowUpDown, title: 'Gesture Scroll', desc: 'Gerakkan kepala ke atas atau bawah untuk scroll halaman' },
                                     { icon: Hand, title: 'Hands-Free', desc: 'Baca Al-Quran sambil berwudhu, makan, atau beraktivitas lainnya' },
                                 ] : [
-                                    { icon: MousePointer2, title: 'Virtual Pointer', desc: 'Arahkan jari telunjuk sebagai pointer virtual' },
-                                    { icon: Hand, title: 'Pinch Scroll', desc: 'Cubit ibu jari & telunjuk lalu geser untuk scroll' },
-                                    { icon: Sparkles, title: 'Gesture Commands', desc: 'Telapak terbuka, tinju, jempol, peace — untuk kontrol' },
+                                    { icon: MousePointer2, title: 'Virtual Pointer & Click', desc: 'Telunjuk ☝️ arahkan kursor. Cubit (Pinch) 🤏 untuk KLIK.' },
+                                    { icon: Hand, title: 'Grab Scroll', desc: 'Kepalkan tangan (Grab) ✊ dan gerakkan untuk SCROLL.' },
+                                    { icon: Sparkles, title: 'Audio & Search', desc: '👍 Play/Stop Audio Full • ✌️ Voice Search' },
                                 ]).map(({ icon: Icon, title, desc }) => (
                                     <div key={title} className="flex items-start gap-3 p-3 rounded-xl border border-border/30 bg-card">
                                         <div className="w-9 h-9 rounded-lg bg-violet-500/10 flex items-center justify-center flex-shrink-0">
                                             <Icon className="w-4.5 h-4.5 text-violet-500" />
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-sm font-medium text-foreground">{title}</p>
+                                            <p className="text-sm font-medium text-foreground">{title} <span className="ml-1 text-[10px] text-amber-500 font-normal border border-amber-500/30 bg-amber-500/10 px-1 rounded">BETA</span></p>
                                             <p className="text-[11px] text-muted-foreground leading-snug">{desc}</p>
                                         </div>
                                     </div>
@@ -208,15 +208,15 @@ const SmartModeOnboarding: React.FC<SmartModeOnboardingProps> = ({
                                     {
                                         num: 2,
                                         icon: MousePointer2,
-                                        title: 'Pointer & Dwell Click',
-                                        desc: 'Acungkan telunjuk untuk pointer. Tahan di atas ayat 1.5 detik untuk membuka aksi.',
+                                        title: 'Pointer, Click & Scroll',
+                                        desc: '☝️ Arahkan pointer. 🤏 Cubit untuk KLIK/BUKA MENU. ✊ Kepal & geser untuk SCROLL.',
                                         color: 'text-violet-500 bg-violet-500/10',
                                     },
                                     {
                                         num: 3,
                                         icon: Hand,
-                                        title: 'Pinch & Gesture',
-                                        desc: 'Cubit ibu jari + telunjuk untuk scroll. ✋ Stop audio, ✌️ Buka search + mic, 👍 Play/pause.',
+                                        title: 'Audio & Search Controls',
+                                        desc: '👍 Play/Stop Audio Full Surah. ✌️ Buka Voice Search.',
                                         color: 'text-emerald-500 bg-emerald-500/10',
                                     },
                                 ]).map(({ num, icon: Icon, title, desc, color }) => (

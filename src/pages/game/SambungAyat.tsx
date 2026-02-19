@@ -22,6 +22,7 @@ import {
     RefreshCw,
     Users,
 } from 'lucide-react';
+import LoginRequiredDialog from '@/components/LoginRequiredDialog';
 import type { Surat } from '@/types/quran';
 
 // ─── Interfaces ───
@@ -83,6 +84,7 @@ const SambungAyat: React.FC = () => {
     const [maxStreak, setMaxStreak] = useState(0);
     const [currentStreak, setCurrentStreak] = useState(0);
     const [loadingQuestions, setLoadingQuestions] = useState(false);
+    const [showLoginDialog, setShowLoginDialog] = useState(false);
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const optionAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -211,6 +213,11 @@ const SambungAyat: React.FC = () => {
     // ─── Start Game ───
 
     const startGame = async () => {
+        if (!user) {
+            setShowLoginDialog(true);
+            return;
+        }
+
         await generateQuestions();
         setGameState('playing');
         setCurrentIndex(0);
@@ -687,6 +694,11 @@ const SambungAyat: React.FC = () => {
                             )}
                         </div>
                     </div>
+
+                    <LoginRequiredDialog
+                        open={showLoginDialog}
+                        onOpenChange={setShowLoginDialog}
+                    />
                 </div>
             </div>
         );
