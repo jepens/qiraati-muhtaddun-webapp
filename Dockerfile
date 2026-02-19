@@ -38,8 +38,10 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy konfigurasi nginx custom
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Update nginx config to remove user directive (still useful)
-RUN sed -i '/user  nginx;/d' /etc/nginx/nginx.conf
+# Update nginx config to remove user and pid directives
+# pid is re-set via CMD -g flag to /tmp/nginx.pid for non-root compatibility
+RUN sed -i '/user  nginx;/d' /etc/nginx/nginx.conf && \
+  sed -i '/^pid/d' /etc/nginx/nginx.conf
 
 # Change ownership of nginx directories
 RUN chown -R appuser:appuser /var/cache/nginx /var/run /var/log/nginx /usr/share/nginx/html /etc/nginx/conf.d && \
