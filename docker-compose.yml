@@ -6,8 +6,9 @@ services:
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
-        VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY}
 
+    ports:
+      - "80:80"
     expose:
       - "80"
     environment:
@@ -23,6 +24,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    depends_on:
+      - qiraati-api
     deploy:
       resources:
         limits:
@@ -50,8 +53,6 @@ services:
     restart: unless-stopped
     networks:
       - qiraati-network
-    depends_on:
-      - qiraati-webapp
     deploy:
       resources:
         limits:

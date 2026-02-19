@@ -5,7 +5,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default [
-  { ignores: ["dist", "backend-example", "setup-vps.sh"] },
+  { ignores: ["dist", "backend-example", "setup-vps.sh", "supabase/functions"] },
   js.configs.recommended,
   {
     files: ["vite.config.ts", "tailwind.config.ts"],
