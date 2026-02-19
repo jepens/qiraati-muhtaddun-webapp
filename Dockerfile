@@ -38,9 +38,8 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy konfigurasi nginx custom
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Update nginx config to use /tmp/nginx.pid and remove user directive
-RUN sed -i 's/\/var\/run\/nginx.pid/\/tmp\/nginx.pid/g' /etc/nginx/nginx.conf && \
-  sed -i '/user  nginx;/d' /etc/nginx/nginx.conf
+# Update nginx config to remove user directive (still useful)
+RUN sed -i '/user  nginx;/d' /etc/nginx/nginx.conf
 
 # Change ownership of nginx directories
 RUN chown -R appuser:appuser /var/cache/nginx /var/run /var/log/nginx /usr/share/nginx/html /etc/nginx/conf.d && \
@@ -56,5 +55,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8080/ || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"] 
+# Start nginx with custom PID location
+CMD ["nginx", "-g", "pid /tmp/nginx.pid; daemon off;"] 
