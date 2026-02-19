@@ -10,6 +10,7 @@ import { ActivitiesProvider } from '@/providers/activities-provider';
 import { GalleryProvider } from '@/providers/gallery-provider';
 import { SmartReaderProvider } from '@/providers/SmartReaderContext';
 import LoadingFallback from '@/components/LoadingFallback';
+import { PWAPrompt } from '@/components/PWAPrompt';
 
 // Lazy load pages
 const Homepage = React.lazy(() => import('@/pages/Homepage'));
@@ -76,6 +77,7 @@ function App() {
                     />
                   </Routes>
                 </Suspense>
+                <PWAPrompt />
                 <Toaster />
                 <RadixToaster />
               </SmartReaderProvider>
