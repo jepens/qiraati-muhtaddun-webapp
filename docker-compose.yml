@@ -8,7 +8,7 @@ services:
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
 
     expose:
-      - "8080"
+      - "80"
     environment:
       - NODE_ENV=production
     restart: unless-stopped
